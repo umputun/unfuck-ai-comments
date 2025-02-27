@@ -15,7 +15,7 @@ import (
 	"github.com/fatih/color"
 )
 
-// Replace os.Exit with a variable for testing
+// replace os.Exit with a variable for testing
 var osExit = os.Exit
 
 func main() {
@@ -51,11 +51,9 @@ func main() {
 	}
 
 	// get files to process
-	var patterns []string
+	patterns := []string{"."}
 	if flag.NArg() > 0 {
 		patterns = flag.Args()
-	} else {
-		patterns = []string{"."}
 	}
 
 	// process each pattern
@@ -120,12 +118,12 @@ func walkDir(dir, outputMode string) {
 		if err != nil {
 			return err
 		}
-		
-		// Skip vendor directories
+
+		// skip vendor directories
 		if info.IsDir() && (info.Name() == "vendor" || strings.Contains(path, "/vendor/")) {
 			return filepath.SkipDir
 		}
-		
+
 		if !info.IsDir() && strings.HasSuffix(path, ".go") {
 			processFile(path, outputMode)
 		}
@@ -198,24 +196,24 @@ func processFile(fileName, outputMode string) {
 			return
 		}
 
-		// Format the original content with gofmt
+		// format the original content with gofmt
 		formattedOrig, err := formatGoCode(string(origBytes))
 		if err != nil {
-			// If formatting fails, fall back to original
+			// if formatting fails, fall back to original
 			formattedOrig = string(origBytes)
 		}
 
-		// Generate modified content
+		// generate modified content
 		var modifiedBytes strings.Builder
 		if err := printer.Fprint(&modifiedBytes, fset, node); err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating diff: %v\n", err)
 			return
 		}
 
-		// Format the modified content with gofmt
+		// format the modified content with gofmt
 		formattedMod, err := formatGoCode(modifiedBytes.String())
 		if err != nil {
-			// If formatting fails, fall back to unformatted
+			// if formatting fails, fall back to unformatted
 			formattedMod = modifiedBytes.String()
 		}
 
@@ -246,7 +244,7 @@ func isCommentInsideFunction(_ *token.FileSet, file *ast.File, comment *ast.Comm
 			// check if comment is inside function body
 			if fn.Body != nil && fn.Body.Lbrace <= commentPos && commentPos <= fn.Body.Rbrace {
 				insideFunc = true
-				return false	// stop traversal
+				return false // stop traversal
 			}
 		}
 		return true
@@ -261,7 +259,8 @@ func convertCommentToLowercase(comment string) string {
 		// single line comment
 		content := strings.TrimPrefix(comment, "//")
 		return "//" + strings.ToLower(content)
-	} else if strings.HasPrefix(comment, "/*") && strings.HasSuffix(comment, "*/") {
+	}
+	if strings.HasPrefix(comment, "/*") && strings.HasSuffix(comment, "*/") {
 		// multi-line comment
 		content := strings.TrimSuffix(strings.TrimPrefix(comment, "/*"), "*/")
 		return "/*" + strings.ToLower(content) + "*/"

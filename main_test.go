@@ -12,7 +12,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-	
+
 	"github.com/fatih/color"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -709,21 +709,21 @@ func Test() {
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
-		// Save current working directory
+		// save current working directory
 		currentDir, err := os.Getwd()
 		if err != nil {
 			t.Fatalf("Failed to get current directory: %v", err)
 		}
 
-		// Change to temp dir for the test
+		// change to temp dir for the test
 		if err := os.Chdir(tempDir); err != nil {
 			t.Fatalf("Failed to change to temp dir: %v", err)
 		}
 
-		// Process pattern from temp directory
+		// process pattern from temp directory
 		processPattern(pattern, mode)
 
-		// Change back to original directory
+		// change back to original directory
 		if err := os.Chdir(currentDir); err != nil {
 			t.Fatalf("Failed to change back to original directory: %v", err)
 		}
@@ -1055,23 +1055,23 @@ func Test() {
 
 // TestProcessPatternComprehensive tests the processPattern function more thoroughly
 func TestProcessPatternComprehensive(t *testing.T) {
-	// Create a temporary directory for test files
+	// create a temporary directory for test files
 	tempDir, err := os.MkdirTemp("", "unfuck-ai-comments-pattern-comprehensive")
 	require.NoError(t, err, "Failed to create temp dir")
 	defer os.RemoveAll(tempDir)
 
-	// Create a subdirectory
+	// create a subdirectory
 	subDir := filepath.Join(tempDir, "subdir")
 	err = os.Mkdir(subDir, 0o750)
 	require.NoError(t, err, "Failed to create subdirectory")
 
-	// Sample content with uppercase comments
+	// sample content with uppercase comments
 	content := `package testpkg
 func Test() {
 	// UPPERCASE COMMENT
 }`
 
-	// Create test files
+	// create test files
 	files := []string{
 		filepath.Join(tempDir, "file1.go"),
 		filepath.Join(tempDir, "file2.go"),
@@ -1079,24 +1079,24 @@ func Test() {
 		filepath.Join(subDir, "subfile.go"),
 	}
 
-	// Write content to files
+	// write content to files
 	for _, file := range files {
 		err = os.WriteFile(file, []byte(content), 0o644)
 		require.NoError(t, err, "Failed to write file %s", file)
 	}
 
-	// Helper function to capture output from processPattern
+	// helper function to capture output from processpattern
 	runProcessPattern := func(pattern, mode string) string {
-		// Capture stdout
+		// capture stdout
 		oldStdout := os.Stdout
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
-		// Save current dir
+		// save current dir
 		currentDir, err := os.Getwd()
 		require.NoError(t, err, "Failed to get current directory")
 
-		// Change to temp dir for the test (if needed)
+		// change to temp dir for the test (if needed)
 		if strings.HasPrefix(pattern, "./") || strings.HasPrefix(pattern, ".") {
 			err = os.Chdir(tempDir)
 			require.NoError(t, err, "Failed to change to temp dir")
@@ -1106,10 +1106,10 @@ func Test() {
 			}()
 		}
 
-		// Run processPattern
+		// run processpattern
 		processPattern(pattern, mode)
 
-		// Restore stdout
+		// restore stdout
 		w.Close()
 		os.Stdout = oldStdout
 		var buf bytes.Buffer
@@ -1117,28 +1117,28 @@ func Test() {
 		return buf.String()
 	}
 
-	// Test different pattern types
+	// test different pattern types
 	patternTests := []struct {
-		name         string
-		pattern      string
-		mode         string
+		name          string
+		pattern       string
+		mode          string
 		expectedFiles int
 	}{
 		{"specific file", filepath.Join(tempDir, "file1.go"), "diff", 1},
 		{"glob pattern", filepath.Join(tempDir, "*.go"), "diff", 2},
-		{"recursive with dots", filepath.Join(tempDir, "..."), "diff", 3}, // All .go files in tempDir and subdirs
+		{"recursive with dots", filepath.Join(tempDir, "..."), "diff", 3}, // all .go files in tempdir and subdirs
 	}
 
 	for _, tc := range patternTests {
 		t.Run(tc.name, func(t *testing.T) {
 			output := runProcessPattern(tc.pattern, tc.mode)
 			count := strings.Count(output, "---")
-			assert.Equal(t, tc.expectedFiles, count, "Expected %d files processed for pattern %s, got %d", 
+			assert.Equal(t, tc.expectedFiles, count, "Expected %d files processed for pattern %s, got %d",
 				tc.expectedFiles, tc.pattern, count)
 		})
 	}
 
-	// Test special ./... pattern 
+	// test special ./... pattern
 	t.Run("./... pattern", func(t *testing.T) {
 		output := runProcessPattern("./...", "diff")
 		count := strings.Count(output, "---")
@@ -1148,12 +1148,12 @@ func Test() {
 
 // TestProcessPatternErrors tests error handling in the processPattern function
 func TestProcessPatternErrors(t *testing.T) {
-	// Create a temporary directory for test files
+	// create a temporary directory for test files
 	tempDir, err := os.MkdirTemp("", "unfuck-ai-comments-pattern-errors")
 	require.NoError(t, err, "Failed to create temp dir")
 	defer os.RemoveAll(tempDir)
 
-	// Create a test file
+	// create a test file
 	testFile := filepath.Join(tempDir, "test.go")
 	err = os.WriteFile(testFile, []byte(`package test
 func Test() {
@@ -1161,74 +1161,74 @@ func Test() {
 }`), 0o644)
 	require.NoError(t, err, "Failed to write test file")
 
-	// Create an inaccessible directory if possible
+	// create an inaccessible directory if possible
 	inaccessibleDir := filepath.Join(tempDir, "noaccess")
 	err = os.Mkdir(inaccessibleDir, 0o000)
 	if err != nil {
 		t.Logf("Warning: Could not create inaccessible directory, skipping part of test: %v", err)
 	}
 
-	// Test with invalid glob pattern
+	// test with invalid glob pattern
 	t.Run("invalid glob pattern", func(t *testing.T) {
-		// Capture stderr
+		// capture stderr
 		oldStderr := os.Stderr
 		r, w, _ := os.Pipe()
 		os.Stderr = w
 
-		// Process with invalid pattern
-		processPattern("[", "diff") // Invalid glob pattern
+		// process with invalid pattern
+		processPattern("[", "diff") // invalid glob pattern
 
-		// Restore stderr
+		// restore stderr
 		w.Close()
 		os.Stderr = oldStderr
 		var buf bytes.Buffer
 		_, _ = buf.ReadFrom(r)
 		output := buf.String()
 
-		// Verify error message
+		// verify error message
 		assert.Contains(t, output, "Error globbing pattern", "Should output error message for invalid pattern")
 	})
 
-	// Test with nonexistent directory in recursive pattern
+	// test with nonexistent directory in recursive pattern
 	t.Run("nonexistent directory", func(t *testing.T) {
-		// Capture stderr
+		// capture stderr
 		oldStderr := os.Stderr
 		r, w, _ := os.Pipe()
 		os.Stderr = w
 
-		// Process with nonexistent directory
+		// process with nonexistent directory
 		processPattern("/nonexistent/dir/...", "diff")
 
-		// Restore stderr
+		// restore stderr
 		w.Close()
 		os.Stderr = oldStderr
 		var buf bytes.Buffer
 		_, _ = buf.ReadFrom(r)
 		output := buf.String()
 
-		// Verify error message
+		// verify error message
 		assert.Contains(t, output, "Error walking directory", "Should output error message for nonexistent directory")
 	})
 
-	if inaccessibleDir != "" && os.Getuid() != 0 { // Skip if running as root
-		// Test with inaccessible directory
+	if inaccessibleDir != "" && os.Getuid() != 0 { // skip if running as root
+		// test with inaccessible directory
 		t.Run("inaccessible directory", func(t *testing.T) {
-			// Capture stderr
+			// capture stderr
 			oldStderr := os.Stderr
 			r, w, _ := os.Pipe()
 			os.Stderr = w
 
-			// Process with inaccessible directory
+			// process with inaccessible directory
 			processPattern(filepath.Join(inaccessibleDir, "..."), "diff")
 
-			// Restore stderr
+			// restore stderr
 			w.Close()
 			os.Stderr = oldStderr
 			var buf bytes.Buffer
 			_, _ = buf.ReadFrom(r)
 			output := buf.String()
 
-			// Verify error message or successful skip
+			// verify error message or successful skip
 			if output != "" {
 				assert.Contains(t, output, "Error", "Should output error message for inaccessible directory")
 			}
@@ -1238,21 +1238,21 @@ func Test() {
 
 // TestProcessFileComprehensive tests all branches of the processFile function
 func TestProcessFileComprehensive(t *testing.T) {
-	// Create a temporary directory
+	// create a temporary directory
 	tempDir, err := os.MkdirTemp("", "unfuck-ai-comments-file-comprehensive")
 	require.NoError(t, err, "Failed to create temp dir")
 	defer os.RemoveAll(tempDir)
 
-	// Create test files with different scenarios
-	// 1. File with no comments to modify
+	// create test files with different scenarios
+	// 1. file with no comments to modify
 	noCommentsFile := filepath.Join(tempDir, "no_comments.go")
 	err = os.WriteFile(noCommentsFile, []byte(`package test
 func Test() {
 	x := 1 // already lowercase comment
 }`), 0o644)
 	require.NoError(t, err, "Failed to write no comments file")
-    
-	// 2. File with comments to modify
+
+	// 2. file with comments to modify
 	withCommentsFile := filepath.Join(tempDir, "with_comments.go")
 	err = os.WriteFile(withCommentsFile, []byte(`package test
 func Test() {
@@ -1261,7 +1261,7 @@ func Test() {
 }`), 0o644)
 	require.NoError(t, err, "Failed to write with comments file")
 
-	// 3. File with parse error
+	// 3. file with parse error
 	badSyntaxFile := filepath.Join(tempDir, "bad_syntax.go")
 	err = os.WriteFile(badSyntaxFile, []byte(`package test
 func Test() {
@@ -1269,7 +1269,7 @@ func Test() {
 `), 0o644)
 	require.NoError(t, err, "Failed to write bad syntax file")
 
-	// 4. File with no modifications needed
+	// 4. file with no modifications needed
 	noModsNeededFile := filepath.Join(tempDir, "no_mods.go")
 	err = os.WriteFile(noModsNeededFile, []byte(`package test
 // This is a package comment
@@ -1278,39 +1278,39 @@ func Test() {
 }`), 0o644)
 	require.NoError(t, err, "Failed to write no mods file")
 
-	// Capture stdout/stderr for testing
+	// capture stdout/stderr for testing
 	captureOutput := func(fn func()) (string, string) {
 		oldStdout := os.Stdout
 		oldStderr := os.Stderr
-		
-		// Capture stdout
+
+		// capture stdout
 		stdoutR, stdoutW, _ := os.Pipe()
 		os.Stdout = stdoutW
-		
-		// Capture stderr
+
+		// capture stderr
 		stderrR, stderrW, _ := os.Pipe()
 		os.Stderr = stderrW
-		
-		// Run the function
+
+		// run the function
 		fn()
-		
-		// Close the writers
+
+		// close the writers
 		stdoutW.Close()
 		stderrW.Close()
-		
-		// Read the outputs
+
+		// read the outputs
 		var stdoutBuf, stderrBuf bytes.Buffer
 		_, _ = stdoutBuf.ReadFrom(stdoutR)
 		_, _ = stderrBuf.ReadFrom(stderrR)
-		
-		// Restore the original outputs
+
+		// restore the original outputs
 		os.Stdout = oldStdout
 		os.Stderr = oldStderr
-		
+
 		return stdoutBuf.String(), stderrBuf.String()
 	}
 
-	// Define tests
+	// define tests
 	tests := []struct {
 		name        string
 		file        string
@@ -1439,24 +1439,24 @@ func Test() {
 		},
 	}
 
-	// Run tests
+	// run tests
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			// Read original content for comparison later
+			// read original content for comparison later
 			originalContent, err := os.ReadFile(tc.file)
 			require.NoError(t, err, "Failed to read original file")
-			
-			// Process the file and capture output
+
+			// process the file and capture output
 			stdout, stderr := captureOutput(func() {
 				processFile(tc.file, tc.outputMode)
 			})
-			
-			// Check outputs
+
+			// check outputs
 			tc.checkStdout(stdout)
 			tc.checkStderr(stderr)
 			tc.checkFile(tc.file, string(originalContent))
-			
-			// Reset the file for next test
+
+			// reset the file for next test
 			if tc.outputMode == "inplace" {
 				err = os.WriteFile(tc.file, originalContent, 0o644)
 				require.NoError(t, err, "Failed to reset file")
@@ -1467,53 +1467,53 @@ func Test() {
 
 // TestErrorsInProcessFile tests error handling paths in processFile
 func TestErrorsInProcessFile(t *testing.T) {
-	// Create a temporary directory for test files
+	// create a temporary directory for test files
 	tempDir, err := os.MkdirTemp("", "unfuck-ai-comments-errors")
 	require.NoError(t, err, "Failed to create temp dir")
 	defer os.RemoveAll(tempDir)
 
-	// Capture both stdout and stderr during tests
+	// capture both stdout and stderr during tests
 	captureOutput := func(fn func()) (string, string) {
 		oldStdout := os.Stdout
 		oldStderr := os.Stderr
-		
-		// Capture stdout
+
+		// capture stdout
 		stdoutR, stdoutW, _ := os.Pipe()
 		os.Stdout = stdoutW
-		
-		// Capture stderr
+
+		// capture stderr
 		stderrR, stderrW, _ := os.Pipe()
 		os.Stderr = stderrW
-		
-		// Run the function
+
+		// run the function
 		fn()
-		
-		// Close the writers
+
+		// close the writers
 		stdoutW.Close()
 		stderrW.Close()
-		
-		// Read the outputs
+
+		// read the outputs
 		var stdoutBuf, stderrBuf bytes.Buffer
 		_, _ = stdoutBuf.ReadFrom(stdoutR)
 		_, _ = stderrBuf.ReadFrom(stderrR)
-		
-		// Restore the original outputs
+
+		// restore the original outputs
 		os.Stdout = oldStdout
 		os.Stderr = oldStderr
-		
+
 		return stdoutBuf.String(), stderrBuf.String()
 	}
 
-	// Test nonexistent file (parse error)
+	// test nonexistent file (parse error)
 	t.Run("nonexistent file", func(t *testing.T) {
 		_, stderr := captureOutput(func() {
 			processFile("/nonexistent/file.go", "inplace")
 		})
-		
+
 		assert.Contains(t, stderr, "Error parsing", "Should output parse error for nonexistent file")
 	})
 
-	// Test parse error with malformed Go code
+	// test parse error with malformed go code
 	t.Run("malformed go file", func(t *testing.T) {
 		badFile := filepath.Join(tempDir, "bad.go")
 		err := os.WriteFile(badFile, []byte(`package test
@@ -1521,15 +1521,15 @@ func Test() {
 	missing closing brace
 `), 0o644)
 		require.NoError(t, err, "Failed to write malformed file")
-		
+
 		_, stderr := captureOutput(func() {
 			processFile(badFile, "inplace")
 		})
-		
+
 		assert.Contains(t, stderr, "Error parsing", "Should output parse error for malformed Go file")
 	})
 
-	// Create a test file with comments to modify
+	// create a test file with comments to modify
 	testFile := filepath.Join(tempDir, "testfile.go")
 	err = os.WriteFile(testFile, []byte(`package test
 func Test() {
@@ -1537,32 +1537,32 @@ func Test() {
 }`), 0o644)
 	require.NoError(t, err, "Failed to write test file")
 
-	// Test printer error in inplace mode
-	// This is tricky as printer.Fprint rarely fails, but we can mock a wrapper around it
+	// test printer error in inplace mode
+	// this is tricky as printer.fprint rarely fails, but we can mock a wrapper around it
 	t.Run("printer error in inplace mode", func(t *testing.T) {
-		// Create a writable directory but with read-only permission on file
-		// First create a dummy file to modify
+		// create a writable directory but with read-only permission on file
+		// first create a dummy file to modify
 		readOnlyFile := filepath.Join(tempDir, "readonly.go")
 		err := os.WriteFile(readOnlyFile, []byte(`package test
 func Test() {
 	// UPPERCASE comment
-}`), 0o400) // Read-only file
+}`), 0o400) // read-only file
 		require.NoError(t, err, "Failed to write read-only file")
-		
-		// Make sure it's actually read-only
-		if runtime.GOOS != "windows" { // Skip chmod tests on Windows
-			// We need to make the file read-only but allow opening for writing
-			// On Unix, we can make a file read-only
+
+		// make sure it's actually read-only
+		if runtime.GOOS != "windows" { // skip chmod tests on windows
+			// we need to make the file read-only but allow opening for writing
+			// on unix, we can make a file read-only
 			err = os.Chmod(readOnlyFile, 0o400)
 			if err != nil {
 				t.Skip("Could not make file read-only, skipping test")
 			}
-			
+
 			_, stderr := captureOutput(func() {
 				processFile(readOnlyFile, "inplace")
 			})
-			
-			// If the system allows opening read-only files for writing,
+
+			// if the system allows opening read-only files for writing,
 			// we should see an error at write time
 			if stderr != "" {
 				assert.Contains(t, stderr, "Error", "Should log error for read-only file")
@@ -1570,58 +1570,58 @@ func Test() {
 		}
 	})
 
-	// Test printer error in print mode
+	// test printer error in print mode
 	t.Run("printer error in print mode", func(t *testing.T) {
-		// Mock os.Stdout with a closed pipe to force an error
+		// mock os.stdout with a closed pipe to force an error
 		oldStdout := os.Stdout
 		_, w, _ := os.Pipe()
 		os.Stdout = w
-		w.Close() // Force error by closing the pipe
-		
-		// Capture stderr
+		w.Close() // force error by closing the pipe
+
+		// capture stderr
 		oldStderr := os.Stderr
 		errR, errW, _ := os.Pipe()
 		os.Stderr = errW
-		
-		// Process file
+
+		// process file
 		processFile(testFile, "print")
-		
-		// Restore stderr
+
+		// restore stderr
 		errW.Close()
 		os.Stderr = oldStderr
 		var errBuf bytes.Buffer
 		_, _ = errBuf.ReadFrom(errR)
 		output := errBuf.String()
-		
-		// Restore stdout
+
+		// restore stdout
 		os.Stdout = oldStdout
-		
-		// Check for error message
+
+		// check for error message
 		assert.Contains(t, output, "Error writing to stdout", "Should report error writing to stdout")
 	})
 
-	// Test diff mode with error reading original file
+	// test diff mode with error reading original file
 	t.Run("diff mode with read error", func(t *testing.T) {
-		// Create a non-readable file for testing
-		if runtime.GOOS != "windows" { // Skip chmod tests on Windows
+		// create a non-readable file for testing
+		if runtime.GOOS != "windows" { // skip chmod tests on windows
 			nonReadableFile := filepath.Join(tempDir, "nonreadable.go")
 			err := os.WriteFile(nonReadableFile, []byte(`package test
 func Test() {
 	// TEST comment
-}`), 0o200) // Write-only file
+}`), 0o200) // write-only file
 			require.NoError(t, err, "Failed to write non-readable file")
-			
-			// Try to make it non-readable
+
+			// try to make it non-readable
 			err = os.Chmod(nonReadableFile, 0o200)
 			if err != nil {
 				t.Skip("Could not make file non-readable, skipping test")
 			}
-			
+
 			_, stderr := captureOutput(func() {
 				processFile(nonReadableFile, "diff")
 			})
-			
-			// Check for error message if the system respects 0o200 permission
+
+			// check for error message if the system respects 0o200 permission
 			if stderr != "" {
 				assert.Contains(t, stderr, "Error", "Should report error for non-readable file")
 			}
@@ -1759,161 +1759,160 @@ func removeWhitespace(s string) string {
 
 // TestProgramOutput tests program behavior with different flags by using processFile directly
 func TestProgramOutput(t *testing.T) {
-	// Create a temp dir for test files
+	// create a temp dir for test files
 	tempDir, err := os.MkdirTemp("", "unfuck-ai-program-test")
 	require.NoError(t, err, "Failed to create temp dir")
 	defer os.RemoveAll(tempDir)
 
-	// Create a test file with comments
+	// create a test file with comments
 	content := `package test
 func Test() {
 	// THIS SHOULD be converted
 	x := 1 // ANOTHER comment
 }`
 
-	// Create test file
+	// create test file
 	testFile := filepath.Join(tempDir, "test_file.go")
 	err = os.WriteFile(testFile, []byte(content), 0o644)
 	require.NoError(t, err, "Failed to write test file")
 
-	// Test inplace mode
+	// test inplace mode
 	t.Run("inplace mode", func(t *testing.T) {
-		// Reset file
+		// reset file
 		err := os.WriteFile(testFile, []byte(content), 0o644)
 		require.NoError(t, err, "Failed to reset test file")
 
-		// Capture stdout
+		// capture stdout
 		oldStdout := os.Stdout
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
-		// Process file in inplace mode
+		// process file in inplace mode
 		processFile(testFile, "inplace")
 
-		// Restore stdout
+		// restore stdout
 		w.Close()
 		os.Stdout = oldStdout
 		var buf bytes.Buffer
 		_, _ = buf.ReadFrom(r)
 		output := buf.String()
 
-		// Verify output
+		// verify output
 		assert.Contains(t, output, "Updated:", "Should show which file was updated")
 
-		// Check file was modified
+		// check file was modified
 		modifiedContent, err := os.ReadFile(testFile)
 		require.NoError(t, err, "Failed to read modified file")
 		modified := string(modifiedContent)
-		
+
 		assert.Contains(t, modified, "// this should", "Should convert uppercase to lowercase")
 		assert.NotContains(t, modified, "// THIS SHOULD", "Should not contain original uppercase comment")
 		assert.Contains(t, modified, "// another comment", "Should convert all in-function comments")
 	})
 
-	// Test dry-run (diff) mode
+	// test dry-run (diff) mode
 	t.Run("diff mode", func(t *testing.T) {
-		// Reset file
+		// reset file
 		err := os.WriteFile(testFile, []byte(content), 0o644)
 		require.NoError(t, err, "Failed to reset test file")
 
-		// Capture stdout
+		// capture stdout
 		oldStdout := os.Stdout
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
-		// Process file in diff mode
+		// process file in diff mode
 		processFile(testFile, "diff")
 
-		// Restore stdout
+		// restore stdout
 		w.Close()
 		os.Stdout = oldStdout
 		var buf bytes.Buffer
 		_, _ = buf.ReadFrom(r)
 		output := buf.String()
 
-		// Verify diff output
+		// verify diff output
 		assert.Contains(t, output, "---", "Diff should show file headers")
 		assert.Contains(t, output, "+++", "Diff should show file headers")
 		assert.Contains(t, output, "// this should", "Diff should show lowercase comments")
-		
-		// File should not be modified
+
+		// file should not be modified
 		modifiedContent, err := os.ReadFile(testFile)
 		require.NoError(t, err, "Failed to read file")
 		assert.Equal(t, content, string(modifiedContent), "File should not be modified in diff mode")
 	})
-	
-	// Test print mode
+
+	// test print mode
 	t.Run("print mode", func(t *testing.T) {
-		// Reset file
+		// reset file
 		err := os.WriteFile(testFile, []byte(content), 0o644)
 		require.NoError(t, err, "Failed to reset test file")
 
-		// Capture stdout
+		// capture stdout
 		oldStdout := os.Stdout
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
-		// Process file in print mode
+		// process file in print mode
 		processFile(testFile, "print")
 
-		// Restore stdout
+		// restore stdout
 		w.Close()
 		os.Stdout = oldStdout
 		var buf bytes.Buffer
 		_, _ = buf.ReadFrom(r)
 		output := buf.String()
 
-		// Verify printed output
+		// verify printed output
 		assert.Contains(t, output, "// this should", "Print output should contain lowercase comments")
 		assert.NotContains(t, output, "// THIS SHOULD", "Print output should not contain uppercase comments")
-		
-		// File should not be modified
+
+		// file should not be modified
 		modifiedContent, err := os.ReadFile(testFile)
 		require.NoError(t, err, "Failed to read file")
 		assert.Equal(t, content, string(modifiedContent), "File should not be modified in print mode")
 	})
-	
-	// Test color functionality
+
+	// test color functionality
 	t.Run("color behavior", func(t *testing.T) {
-		// Save current color setting and restore it after test
+		// save current color setting and restore it after test
 		originalNoColor := color.NoColor
 		defer func() { color.NoColor = originalNoColor }()
-		
-		// Test with colors disabled
+
+		// test with colors disabled
 		color.NoColor = true
 		assert.True(t, color.NoColor, "NoColor should be true when colors are disabled")
-		
-		// Process file with colors disabled
+
+		// process file with colors disabled
 		oldStdout := os.Stdout
 		r, w, _ := os.Pipe()
 		os.Stdout = w
-		
+
 		processFile(testFile, "diff")
-		
+
 		w.Close()
 		os.Stdout = oldStdout
 		var buf bytes.Buffer
 		_, _ = buf.ReadFrom(r)
 		output := buf.String()
-		
-		// Verify output (should not contain ANSI color codes)
+
+		// verify output (should not contain ansi color codes)
 		assert.Contains(t, output, "---", "Output should contain diff markers")
-		
-		// Test with colors enabled (for coverage)
+
+		// test with colors enabled (for coverage)
 		color.NoColor = false
 		assert.False(t, color.NoColor, "NoColor should be false when colors are enabled")
 	})
 }
 
-
 // TestMainFunctionMock creates a mock version of main to test all branches
 func TestMainFunctionMock(t *testing.T) {
-	// Create a temporary directory for test files
+	// create a temporary directory for test files
 	tempDir, err := os.MkdirTemp("", "unfuck-ai-main-mock")
 	require.NoError(t, err, "Failed to create temp dir")
 	defer os.RemoveAll(tempDir)
 
-	// Create a test file with comments
+	// create a test file with comments
 	testFile := filepath.Join(tempDir, "mock_test.go")
 	content := `package test
 func Test() {
@@ -1922,14 +1921,14 @@ func Test() {
 	err = os.WriteFile(testFile, []byte(content), 0o644)
 	require.NoError(t, err, "Failed to write test file")
 
-	// Mock version of main
+	// mock version of main
 	mockMain := func(outputMode string, dryRun, showHelp, noColor bool, patterns []string) string {
-		// Capture output
+		// capture output
 		oldStdout := os.Stdout
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
-		// Set color setting
+		// set color setting
 		color.NoColor = noColor
 
 		// if dry-run is set, override output mode to diff
@@ -1962,7 +1961,7 @@ func Test() {
 			processPattern(pattern, outputMode)
 		}
 
-		// Restore stdout
+		// restore stdout
 		w.Close()
 		os.Stdout = oldStdout
 		var buf bytes.Buffer
@@ -1970,15 +1969,15 @@ func Test() {
 		return buf.String()
 	}
 
-	// Test cases
+	// test cases
 	tests := []struct {
-		name     string
+		name       string
 		outputMode string
-		dryRun   bool
-		showHelp bool
-		noColor  bool
-		patterns []string
-		verify   func(string)
+		dryRun     bool
+		showHelp   bool
+		noColor    bool
+		patterns   []string
+		verify     func(string)
 	}{
 		{
 			name:     "help flag",
@@ -1988,9 +1987,9 @@ func Test() {
 			},
 		},
 		{
-			name:       "dry run flag",
-			dryRun:     true,
-			patterns:   []string{testFile},
+			name:     "dry run flag",
+			dryRun:   true,
+			patterns: []string{testFile},
 			verify: func(output string) {
 				assert.Contains(t, output, "---", "Dry run should show diff")
 				assert.Contains(t, output, "+++", "Dry run should show diff")
@@ -2010,8 +2009,8 @@ func Test() {
 			outputMode: "inplace",
 			patterns:   []string{},
 			verify: func(output string) {
-				// This might be empty if no .go files in current dir, or might show files processed
-				// Just ensuring it doesn't crash
+				// this might be empty if no .go files in current dir, or might show files processed
+				// just ensuring it doesn't crash
 			},
 		},
 		{
@@ -2024,16 +2023,16 @@ func Test() {
 		},
 	}
 
-	// Run test cases
+	// run test cases
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			// Reset color setting
+			// reset color setting
 			color.NoColor = false
-			
-			// Run mock main
+
+			// run mock main
 			output := mockMain(tc.outputMode, tc.dryRun, tc.showHelp, tc.noColor, tc.patterns)
-			
-			// Verify output
+
+			// verify output
 			tc.verify(output)
 		})
 	}
