@@ -34,7 +34,7 @@ jobs:
     - name: golangci-lint
       uses: golangci/golangci-lint-action@v6
       with:
-        version: v1.61
+        version: v1.65
 
     - name: install goveralls
       run: go install github.com/mattn/goveralls@latest
