@@ -43,7 +43,7 @@ The tool is smart enough to preserve proper documentation comments (package comm
 ## Installation
 
 ```
-go install github.com/umputun/unai-comments@latest
+go install github.com/umputun/unfuck-ai-comments@latest
 ```
 
 ## Usage
