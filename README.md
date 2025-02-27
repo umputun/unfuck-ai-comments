@@ -1,6 +1,4 @@
-# unfuck-ai-comments
-
-[![build](https://github.com/umputun/unfuck-ai-comments/actions/workflows/ci.yml/badge.svg)](https://github.com/umputun/unfuck-ai-comments/actions/workflows/ci.yml)&nbsp;[![Coverage Status](https://coveralls.io/repos/github/umputun/unfuck-ai-comments/badge.svg?branch=master)](https://coveralls.io/github/umputun/unfuck-ai-comments?branch=master)
+# unfuck-ai-comments [![build](https://github.com/umputun/unfuck-ai-comments/actions/workflows/ci.yml/badge.svg)](https://github.com/umputun/unfuck-ai-comments/actions/workflows/ci.yml)&nbsp;[![Coverage Status](https://coveralls.io/repos/github/umputun/unfuck-ai-comments/badge.svg?branch=master)](https://coveralls.io/github/umputun/unfuck-ai-comments?branch=master)
 
 A simple CLI tool that converts all comments inside Go functions to lowercase while preserving comments for packages and function definitions. This makes comments in code consistent and easier to read.
 
