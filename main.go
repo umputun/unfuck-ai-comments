@@ -36,9 +36,7 @@ type Options struct {
 		} `positional-args:"yes"`
 	} `command:"print" description:"Print processed content to stdout"`
 
-	NoColor bool `long:"no-color" description:"Disable colorized output"`
-	Verbose bool `short:"v" long:"verbose" description:"Show verbose output"`
-	DryRun  bool `long:"dry" description:"Don't modify files, just show what would be changed"`
+	DryRun bool `long:"dry" description:"Don't modify files, just show what would be changed"`
 }
 
 var osExit = os.Exit // replace os.Exit with a variable for testing
@@ -48,7 +46,6 @@ func main() {
 	var opts Options
 	p := flags.NewParser(&opts, flags.Default)
 
-	// add description and usage
 	p.LongDescription = "Convert in-function comments to lowercase while preserving comments outside functions"
 
 	// handle parsing errors
@@ -60,9 +57,6 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
 		osExit(1)
 	}
-
-	// enable/disable colors
-	color.NoColor = opts.NoColor
 
 	// determine the mode based on command or flags
 	mode := "inplace" // default
@@ -95,15 +89,16 @@ func main() {
 	}
 }
 
+// patterns to process, defaulting to current directory
 func patterns(p []string) []string {
-	// get patterns to process, defaulting to current directory
-	patterns := p
-	if len(patterns) == 0 {
-		patterns = []string{"."}
+	res := p
+	if len(res) == 0 {
+		res = []string{"."}
 	}
-	return patterns
+	return res
 }
 
+// processPattern processes a single pattern
 func processPattern(pattern, outputMode string) {
 	// handle special "./..." pattern for recursive search
 	if pattern == "./..." {

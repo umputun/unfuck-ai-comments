@@ -79,8 +79,6 @@ unfuck-ai-comments diff ./...
 
 ## Options
 
-- `--no-color`: Disable colorized output
-- `--verbose` or `-v`: Show verbose output
 - `--dry`: Don't modify files, just show what would be changed (shortcut for diff command)
 - `--help` or `-h`: Show usage information
 
