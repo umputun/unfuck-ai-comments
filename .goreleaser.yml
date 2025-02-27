@@ -22,7 +22,6 @@ builds:
         goarch: arm
       - goos: windows
         goarch: arm64
-    dir: app
     ldflags: "-s -w -X main.revision={{.Tag}}-{{.ShortCommit}}-{{.CommitDate}}"
 
 archives:

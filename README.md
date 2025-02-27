@@ -46,7 +46,7 @@ go install github.com/umputun/unfuck-ai-comments@latest
 
 ## Usage
 
-The tool now uses subcommands for different operations:
+The tool uses subcommands for different operations:
 
 ```
 unfuck-ai-comments [options] <command> [file-patterns...]
