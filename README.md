@@ -47,6 +47,7 @@ go install github.com/umputun/unfuck-ai-comments@latest
 <details markdown>
   <summary>Other install methods</summary>
 
+
 **Install from homebrew (macOS)**
 
 ```bash
