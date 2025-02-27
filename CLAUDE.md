@@ -5,7 +5,7 @@
 - Run tests: `go test ./...`
 - Run specific test: `go test -run TestName ./path/to/package`
 - Run tests with coverage: `go test -cover ./...`
-- Run golang-lint: `golang-lint run ./...`
+- Run linting: `golangci-lint run ./...`
 - Format code: `gofmt -s -w .`
 
 ## Code Style Guidelines
@@ -18,3 +18,4 @@
 - Return early when possible to avoid deep nesting
 - Prefer composition over inheritance
 - Keep functions small and focused on a single responsibility
+- Comment style: in-function comments should be lowercase sentences
