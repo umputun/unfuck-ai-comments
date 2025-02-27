@@ -171,6 +171,135 @@ func TestConvertCommentToLowercase(t *testing.T) {
 	}
 }
 
+// TestConvertCommentToTitleCase tests the title case comment conversion function
+func TestConvertCommentToTitleCase(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "single line comment",
+			input:    "// This SHOULD Be Converted",
+			expected: "// this SHOULD Be Converted",
+		},
+		{
+			name:     "multi-line comment",
+			input:    "/* This SHOULD\nBe Converted */",
+			expected: "/* this SHOULD\nBe Converted */",
+		},
+		{
+			name:     "uppercase first letter",
+			input:    "// UPPER case comment",
+			expected: "// uPPER case comment",
+		},
+		{
+			name:     "comment with special chars",
+			input:    "// Special: @#$%^&*()",
+			expected: "// special: @#$%^&*()",
+		},
+		{
+			name:     "comment with code example",
+			input:    "// Example: const X = 123",
+			expected: "// example: const X = 123",
+		},
+		{
+			name:     "empty comment",
+			input:    "//",
+			expected: "//",
+		},
+		{
+			name:     "comment with leading space",
+			input:    "//  Leading space",
+			expected: "//  leading space",
+		},
+		{
+			name:     "multi-line with indentation",
+			input:    "/*\n * Line 1\n * Line 2\n */",
+			expected: "/*\n * Line 1\n * Line 2\n */",
+		},
+		{
+			name:     "not a comment",
+			input:    "const X = 1",
+			expected: "const X = 1", // should return unchanged
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := convertCommentToTitleCase(test.input)
+			assert.Equal(t, test.expected, result, "Title case comment conversion failed")
+		})
+	}
+}
+
+// TestProcessFileWithTitleOption tests the title case option
+func TestProcessFileWithTitleOption(t *testing.T) {
+	// create a temporary directory for test files
+	tempDir, err := os.MkdirTemp("", "unfuck-ai-comments-title-test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// test content with uppercase comments
+	content := `package testpkg
+
+func Example() {
+	// THIS COMMENT should be TITLE CASED
+	x := 1 // ANOTHER Comment Here
+}`
+
+	// write test file
+	testFile := filepath.Join(tempDir, "title_test.go")
+	err = os.WriteFile(testFile, []byte(content), 0o600)
+	if err != nil {
+		t.Fatalf("Failed to write test file: %v", err)
+	}
+
+	// capture stdout
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	// process the file with title case option
+	processFile(testFile, "inplace", true)
+
+	// restore stdout
+	err = w.Close()
+	require.NoError(t, err)
+	os.Stdout = oldStdout
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(r)
+	output := buf.String()
+
+	// verify "updated" message
+	if !strings.Contains(output, "Updated:") {
+		t.Error("Missing 'Updated' message for inplace mode")
+	}
+
+	// check that the file was updated
+	modifiedContent, err := os.ReadFile(testFile)
+	if err != nil {
+		t.Fatalf("Failed to read modified file: %v", err)
+	}
+
+	// check specific modifications
+	modified := string(modifiedContent)
+	if strings.Contains(modified, "// THIS") {
+		t.Error("Failed to convert first letter of comment to lowercase")
+	}
+	if !strings.Contains(modified, "// this COMMENT") && !strings.Contains(modified, "// tHIS COMMENT") {
+		t.Error("Did not properly convert just the first letter to lowercase")
+	}
+	if !strings.Contains(modified, "// another") && !strings.Contains(modified, "// anotherComment Here") && !strings.Contains(modified, "// aNOTHER") {
+		t.Error("Did not convert first letter of second comment to lowercase")
+	}
+	if !strings.Contains(modified, "Comment Here") {
+		t.Error("Modified more than just the first letter in title case mode")
+	}
+}
+
 // TestProcessFileFunctionality tests the file processing logic using a temp file
 func TestProcessFileFunctionality(t *testing.T) {
 	// create a temporary directory for test files
@@ -250,7 +379,7 @@ func NoComments() {
 		os.Stdout = w
 
 		// process the file
-		processFile(testFile, "inplace")
+		processFile(testFile, "inplace", false)
 
 		// restore stdout
 		err := w.Close()
@@ -309,7 +438,7 @@ func NoComments() {
 		os.Stdout = w
 
 		// process the file
-		processFile(testFile, "print")
+		processFile(testFile, "print", false)
 
 		// restore stdout and capture output
 		err := w.Close()
@@ -341,7 +470,7 @@ func NoComments() {
 		os.Stdout = w
 
 		// process the file
-		processFile(testFile, "diff")
+		processFile(testFile, "diff", false)
 
 		// restore stdout and capture output
 		err := w.Close()
@@ -367,7 +496,7 @@ func NoComments() {
 		os.Stdout = w
 
 		// this should silently ignore the invalid mode
-		processFile(testFile, "invalid")
+		processFile(testFile, "invalid", false)
 
 		err := w.Close()
 		require.NoError(t, err)
@@ -386,7 +515,7 @@ func NoComments() {
 		os.Stderr = w
 
 		// process invalid file
-		processFile(invalidFile, "diff")
+		processFile(invalidFile, "diff", false)
 
 		err := w.Close()
 		require.NoError(t, err)
@@ -407,7 +536,7 @@ func NoComments() {
 		os.Stdout = w
 
 		// process file with no comments that need changing
-		processFile(noCommentsFile, "inplace")
+		processFile(noCommentsFile, "inplace", false)
 
 		err := w.Close()
 		require.NoError(t, err)
@@ -441,7 +570,7 @@ func NoComments() {
 		os.Stderr = w
 
 		// try to modify the read-only file
-		processFile(readOnlyFile, "inplace")
+		processFile(readOnlyFile, "inplace", false)
 
 		// restore stderr and capture output
 		err := w.Close()
@@ -728,7 +857,7 @@ func Test() {
 		}
 
 		// process pattern from temp directory
-		processPattern(pattern, mode)
+		processPattern(pattern, mode, false)
 
 		// change back to original directory
 		if err := os.Chdir(currentDir); err != nil {
@@ -782,7 +911,7 @@ func Test() {
 		os.Stderr = w
 
 		// invalid glob pattern
-		processPattern("[", "diff")
+		processPattern("[", "diff", false)
 
 		err := w.Close()
 		require.NoError(t, err)
@@ -1041,7 +1170,7 @@ func Test() {
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
-		processPattern(pattern, "diff")
+		processPattern(pattern, "diff", false)
 
 		err := w.Close()
 		require.NoError(t, err)
@@ -1117,7 +1246,7 @@ func Test() {
 		}
 
 		// run processpattern
-		processPattern(pattern, mode)
+		processPattern(pattern, mode, false)
 
 		// restore stdout
 		err = w.Close()
@@ -1185,7 +1314,7 @@ func Test() {
 		os.Stderr = w
 
 		// process with invalid pattern
-		processPattern("[", "diff") // invalid glob pattern
+		processPattern("[", "diff", false) // invalid glob pattern
 
 		// restore stderr
 		err := w.Close()
@@ -1207,7 +1336,7 @@ func Test() {
 		os.Stderr = w
 
 		// process with nonexistent directory
-		processPattern("/nonexistent/dir/...", "diff")
+		processPattern("/nonexistent/dir/...", "diff", false)
 
 		// restore stderr
 		err := w.Close()
@@ -1230,7 +1359,7 @@ func Test() {
 			os.Stderr = w
 
 			// process with inaccessible directory
-			processPattern(filepath.Join(inaccessibleDir, "..."), "diff")
+			processPattern(filepath.Join(inaccessibleDir, "..."), "diff", false)
 
 			// restore stderr
 			err := w.Close()
@@ -1460,7 +1589,7 @@ func Test() {
 
 			// process the file and capture output
 			stdout, stderr := captureOutput(func() {
-				processFile(tc.file, tc.outputMode)
+				processFile(tc.file, tc.outputMode, false)
 			})
 
 			// check outputs
@@ -1519,7 +1648,7 @@ func TestErrorsInProcessFile(t *testing.T) {
 	// test nonexistent file (parse error)
 	t.Run("nonexistent file", func(t *testing.T) {
 		_, stderr := captureOutput(func() {
-			processFile("/nonexistent/file.go", "inplace")
+			processFile("/nonexistent/file.go", "inplace", false)
 		})
 
 		assert.Contains(t, stderr, "Error parsing", "Should output parse error for nonexistent file")
@@ -1535,7 +1664,7 @@ func Test() {
 		require.NoError(t, err, "Failed to write malformed file")
 
 		_, stderr := captureOutput(func() {
-			processFile(badFile, "inplace")
+			processFile(badFile, "inplace", false)
 		})
 
 		assert.Contains(t, stderr, "Error parsing", "Should output parse error for malformed Go file")
@@ -1571,7 +1700,7 @@ func Test() {
 			}
 
 			_, stderr := captureOutput(func() {
-				processFile(readOnlyFile, "inplace")
+				processFile(readOnlyFile, "inplace", false)
 			})
 
 			// if the system allows opening read-only files for writing,
@@ -1597,7 +1726,7 @@ func Test() {
 		os.Stderr = errW
 
 		// process file
-		processFile(testFile, "print")
+		processFile(testFile, "print", false)
 
 		// restore stderr
 		err = errW.Close()
@@ -1632,7 +1761,7 @@ func Test() {
 			}
 
 			_, stderr := captureOutput(func() {
-				processFile(nonReadableFile, "diff")
+				processFile(nonReadableFile, "diff", false)
 			})
 
 			// check for error message if the system respects 0o200 permission
@@ -1711,7 +1840,7 @@ func Test() {
 		}
 
 		// process all files recursively
-		processPattern("./...", "diff")
+		processPattern("./...", "diff", false)
 
 		// change back to original directory
 		if err := os.Chdir(currentDir); err != nil {
@@ -1803,7 +1932,7 @@ func Test() {
 		os.Stdout = w
 
 		// process file in inplace mode
-		processFile(testFile, "inplace")
+		processFile(testFile, "inplace", false)
 
 		// restore stdout
 		err = w.Close()
@@ -1838,7 +1967,7 @@ func Test() {
 		os.Stdout = w
 
 		// process file in diff mode
-		processFile(testFile, "diff")
+		processFile(testFile, "diff", false)
 
 		// restore stdout
 		err = w.Close()
@@ -1871,7 +2000,7 @@ func Test() {
 		os.Stdout = w
 
 		// process file in print mode
-		processFile(testFile, "print")
+		processFile(testFile, "print", false)
 
 		// restore stdout
 		err = w.Close()
@@ -1906,7 +2035,7 @@ func Test() {
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
-		processFile(testFile, "diff")
+		processFile(testFile, "diff", false)
 
 		err := w.Close()
 		require.NoError(t, err)
@@ -1977,7 +2106,7 @@ func Test() {
 
 		// process each pattern
 		for _, pattern := range patterns {
-			processPattern(pattern, outputMode)
+			processPattern(pattern, outputMode, false)
 		}
 
 		// restore stdout
@@ -2090,7 +2219,7 @@ func TestFunc() {
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
-		processFile(testFile, "inplace")
+		processFile(testFile, "inplace", false)
 
 		err := w.Close()
 		require.NoError(t, err)
@@ -2134,7 +2263,7 @@ func TestFunc() {
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
-		processFile(testFile, "diff")
+		processFile(testFile, "diff", false)
 
 		err := w.Close()
 		require.NoError(t, err)
@@ -2171,7 +2300,7 @@ func TestFunc() {
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
-		processFile(testFile, "print")
+		processFile(testFile, "print", false)
 
 		err := w.Close()
 		require.NoError(t, err)

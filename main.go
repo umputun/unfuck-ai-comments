@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
 
 	"github.com/fatih/color"
 	"github.com/jessevdk/go-flags"
@@ -18,31 +19,32 @@ import (
 
 // Options holds command line options
 type Options struct {
-	Run struct {
+	Run	struct {
 		Args struct {
 			Patterns []string `positional-arg-name:"FILE/PATTERN" description:"Files or patterns to process (default: current directory)"`
 		} `positional-args:"yes"`
-	} `command:"run" description:"Process files in-place (default)"`
+	}	`command:"run" description:"Process files in-place (default)"`
 
-	Diff struct {
+	Diff	struct {
 		Args struct {
 			Patterns []string `positional-arg-name:"FILE/PATTERN" description:"Files or patterns to process (default: current directory)"`
 		} `positional-args:"yes"`
-	} `command:"diff" description:"Show diff without modifying files"`
+	}	`command:"diff" description:"Show diff without modifying files"`
 
-	Print struct {
+	Print	struct {
 		Args struct {
 			Patterns []string `positional-arg-name:"FILE/PATTERN" description:"Files or patterns to process (default: current directory)"`
 		} `positional-args:"yes"`
-	} `command:"print" description:"Print processed content to stdout"`
+	}	`command:"print" description:"Print processed content to stdout"`
 
-	DryRun bool `long:"dry" description:"Don't modify files, just show what would be changed"`
+	DryRun	bool	`long:"dry" description:"Don't modify files, just show what would be changed"`
+	Title	bool	`long:"title" description:"Convert only the first character to lowercase, keep the rest unchanged"`
 }
 
-var osExit = os.Exit // replace os.Exit with a variable for testing
+var osExit = os.Exit	// replace os.Exit with a variable for testing
 
 func main() {
-	// sefine options
+	// define options
 	var opts Options
 	p := flags.NewParser(&opts, flags.Default)
 
@@ -59,7 +61,7 @@ func main() {
 	}
 
 	// determine the mode based on command or flags
-	mode := "inplace" // default
+	mode := "inplace"	// default
 
 	var args []string
 	// process according to command or flags
@@ -85,7 +87,7 @@ func main() {
 
 	// process each pattern
 	for _, pattern := range patterns(args) {
-		processPattern(pattern, mode)
+		processPattern(pattern, mode, opts.Title)
 	}
 }
 
@@ -99,10 +101,10 @@ func patterns(p []string) []string {
 }
 
 // processPattern processes a single pattern
-func processPattern(pattern, outputMode string) {
+func processPattern(pattern, outputMode string, titleCase bool) {
 	// handle special "./..." pattern for recursive search
 	if pattern == "./..." {
-		walkDir(".", outputMode)
+		walkDir(".", outputMode, titleCase)
 		return
 	}
 
@@ -114,7 +116,7 @@ func processPattern(pattern, outputMode string) {
 		if dir == "" {
 			dir = "."
 		}
-		walkDir(dir, outputMode)
+		walkDir(dir, outputMode, titleCase)
 		return
 	}
 
@@ -152,12 +154,12 @@ func processPattern(pattern, outputMode string) {
 		if !strings.HasSuffix(file, ".go") {
 			continue
 		}
-		processFile(file, outputMode)
+		processFile(file, outputMode, titleCase)
 	}
 }
 
 // walkDir recursively processes all .go files in directory and subdirectories
-func walkDir(dir, outputMode string) {
+func walkDir(dir, outputMode string, titleCase bool) {
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -169,7 +171,7 @@ func walkDir(dir, outputMode string) {
 		}
 
 		if !info.IsDir() && strings.HasSuffix(path, ".go") {
-			processFile(path, outputMode)
+			processFile(path, outputMode, titleCase)
 		}
 		return nil
 	})
@@ -178,7 +180,7 @@ func walkDir(dir, outputMode string) {
 	}
 }
 
-func processFile(fileName, outputMode string) {
+func processFile(fileName, outputMode string, titleCase bool) {
 	// parse the file
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, fileName, nil, parser.ParseComments)
@@ -195,9 +197,14 @@ func processFile(fileName, outputMode string) {
 			if isCommentInsideFunction(fset, node, comment) {
 				// process the comment text
 				orig := comment.Text
-				lower := convertCommentToLowercase(orig)
-				if orig != lower {
-					comment.Text = lower
+				var processed string
+				if titleCase {
+					processed = convertCommentToTitleCase(orig)
+				} else {
+					processed = convertCommentToLowercase(orig)
+				}
+				if orig != processed {
+					comment.Text = processed
 					modified = true
 				}
 			}
@@ -213,7 +220,7 @@ func processFile(fileName, outputMode string) {
 	switch outputMode {
 	case "inplace":
 		// write modified source back to file
-		file, err := os.Create(fileName) //nolint:gosec
+		file, err := os.Create(fileName)	//nolint:gosec
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error opening %s for writing: %v\n", fileName, err)
 			return
@@ -234,7 +241,7 @@ func processFile(fileName, outputMode string) {
 
 	case "diff":
 		// generate diff output
-		origBytes, err := os.ReadFile(fileName) //nolint:gosec
+		origBytes, err := os.ReadFile(fileName)	//nolint:gosec
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error reading original file %s: %v\n", fileName, err)
 			return
@@ -288,7 +295,7 @@ func isCommentInsideFunction(_ *token.FileSet, file *ast.File, comment *ast.Comm
 			// check if comment is inside function body
 			if fn.Body != nil && fn.Body.Lbrace <= commentPos && commentPos <= fn.Body.Rbrace {
 				insideFunc = true
-				return false // stop traversal
+				return false	// stop traversal
 			}
 		}
 		return true
@@ -308,6 +315,59 @@ func convertCommentToLowercase(comment string) string {
 		// multi-line comment
 		content := strings.TrimSuffix(strings.TrimPrefix(comment, "/*"), "*/")
 		return "/*" + strings.ToLower(content) + "*/"
+	}
+	return comment
+}
+
+// convertCommentToTitleCase converts only the first character of a comment to lowercase,
+// preserving the case of the rest of the text and the comment markers
+func convertCommentToTitleCase(comment string) string {
+	if strings.HasPrefix(comment, "//") {
+		// single line comment
+		content := strings.TrimPrefix(comment, "//")
+		if content != "" {
+			// skip leading whitespace
+			i := 0
+			for i < len(content) && unicode.IsSpace(rune(content[i])) {
+				i++
+			}
+
+			// if there's content after whitespace
+			if i < len(content) {
+				// convert only first non-whitespace character to lowercase
+				prefix := content[:i]
+				firstChar := strings.ToLower(string(content[i]))
+				restOfContent := content[i+1:]
+				return "//" + prefix + firstChar + restOfContent
+			}
+		}
+		return "//" + content
+	}
+	if strings.HasPrefix(comment, "/*") && strings.HasSuffix(comment, "*/") {
+		// multi-line comment
+		content := strings.TrimSuffix(strings.TrimPrefix(comment, "/*"), "*/")
+
+		// split by lines to handle multi-line comments
+		lines := strings.Split(content, "\n")
+		if len(lines) > 0 {
+			// process the first line
+			line := lines[0]
+			i := 0
+			for i < len(line) && unicode.IsSpace(rune(line[i])) {
+				i++
+			}
+
+			if i < len(line) {
+				prefix := line[:i]
+				firstChar := strings.ToLower(string(line[i]))
+				restOfLine := line[i+1:]
+				lines[0] = prefix + firstChar + restOfLine
+			}
+
+			return "/*" + strings.Join(lines, "\n") + "*/"
+		}
+
+		return "/*" + content + "*/"
 	}
 	return comment
 }
