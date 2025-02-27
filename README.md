@@ -44,6 +44,44 @@ The tool is smart enough to preserve proper documentation comments (package comm
 go install github.com/umputun/unfuck-ai-comments@latest
 ```
 
+<details markdown>
+  <summary>Other install methods</summary>
+
+**Install from homebrew (macOS)**
+
+```bash
+brew tap umputun/apps
+brew install umputun/apps/unfuck-ai-comments
+```
+
+**Install from deb package (Ubuntu/Debian)**
+
+1. Download the latest version of the package by running: `wget https://github.com/umputun/unfuck-ai-comments/releases/download/<versiom>/unfuck-ai-comments_<version>_linux_<arch>.deb` (replace `<version>` and `<arch>` with the actual values).
+2. Install the package by running: `sudo dpkg -i unfuck-ai-comments_<version>_linux_<arch>.deb`
+
+Example for the version 0.1.1 and amd64 architecture:
+
+```bash
+wget https://github.com/umputun/unfuck-ai-comments/releases/download/v0.1.1/unfuck-ai-comments_v0.1.1_linux_<arch>.deb
+sudo dpkg -i unfuck-ai-comments_v0.1.1_linux_<arch>.deb
+```
+
+**Install from rpm package (CentOS/RHEL/Fedora/AWS Linux)**
+
+```bash
+wget https://github.com/umputun/unfuck-ai-comments/releases/download/v<version>/unfuck-ai-comments_v<version>_linux_<arch>.rpm
+sudo rpm -i unfuck-ai-comments_v<version>_linux_<arch>.rpm
+```
+
+**Install from apk package (Alpine)**
+
+```bash
+wget https://github.com/umputun/unfuck-ai-comments/releases/download/<versiom>/unfuck-ai-comments_<version>_linux_<arch>.apk
+sudo apk add unfuck-ai-comments_<version>_linux_<arch>.apk
+```
+
+</details>
+
 ## Usage
 
 The tool uses subcommands for different operations:
