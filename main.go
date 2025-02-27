@@ -18,30 +18,30 @@ import (
 
 // Options holds command line options
 type Options struct {
-	Run	struct {
+	Run struct {
 		Args struct {
 			Patterns []string `positional-arg-name:"FILE/PATTERN" description:"Files or patterns to process (default: current directory)"`
 		} `positional-args:"yes"`
-	}	`command:"run" description:"Process files in-place (default)"`
+	} `command:"run" description:"Process files in-place (default)"`
 
-	Diff	struct {
+	Diff struct {
 		Args struct {
 			Patterns []string `positional-arg-name:"FILE/PATTERN" description:"Files or patterns to process (default: current directory)"`
 		} `positional-args:"yes"`
-	}	`command:"diff" description:"Show diff without modifying files"`
+	} `command:"diff" description:"Show diff without modifying files"`
 
-	Print	struct {
+	Print struct {
 		Args struct {
 			Patterns []string `positional-arg-name:"FILE/PATTERN" description:"Files or patterns to process (default: current directory)"`
 		} `positional-args:"yes"`
-	}	`command:"print" description:"Print processed content to stdout"`
+	} `command:"print" description:"Print processed content to stdout"`
 
-	NoColor	bool	`long:"no-color" description:"Disable colorized output"`
-	Verbose	bool	`short:"v" long:"verbose" description:"Show verbose output"`
-	DryRun	bool	`long:"dry" description:"Don't modify files, just show what would be changed"`
+	NoColor bool `long:"no-color" description:"Disable colorized output"`
+	Verbose bool `short:"v" long:"verbose" description:"Show verbose output"`
+	DryRun  bool `long:"dry" description:"Don't modify files, just show what would be changed"`
 }
 
-var osExit = os.Exit	// replace os.Exit with a variable for testing
+var osExit = os.Exit // replace os.Exit with a variable for testing
 
 func main() {
 	// sefine options
@@ -65,7 +65,7 @@ func main() {
 	color.NoColor = opts.NoColor
 
 	// determine the mode based on command or flags
-	mode := "inplace"	// default
+	mode := "inplace" // default
 
 	var args []string
 	// process according to command or flags
@@ -218,7 +218,7 @@ func processFile(fileName, outputMode string) {
 	switch outputMode {
 	case "inplace":
 		// write modified source back to file
-		file, err := os.Create(fileName)
+		file, err := os.Create(fileName) //nolint:gosec
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error opening %s for writing: %v\n", fileName, err)
 			return
@@ -239,7 +239,7 @@ func processFile(fileName, outputMode string) {
 
 	case "diff":
 		// generate diff output
-		origBytes, err := os.ReadFile(fileName)
+		origBytes, err := os.ReadFile(fileName) //nolint:gosec
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error reading original file %s: %v\n", fileName, err)
 			return
@@ -293,7 +293,7 @@ func isCommentInsideFunction(_ *token.FileSet, file *ast.File, comment *ast.Comm
 			// check if comment is inside function body
 			if fn.Body != nil && fn.Body.Lbrace <= commentPos && commentPos <= fn.Body.Rbrace {
 				insideFunc = true
-				return false	// stop traversal
+				return false // stop traversal
 			}
 		}
 		return true

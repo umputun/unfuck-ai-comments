@@ -48,8 +48,6 @@ linters:
 
 
 run:
-  #  modules-download-mode: vendor
-
   concurrency: 4
 
 issues:
@@ -85,13 +83,15 @@ issues:
         - unused
         - revive
       path: _test\.go$
-      text: "unused-parameter"
-    # Exclude all gosec issues for test files
-    - path: "_test.go"
+    - text: "Potential file inclusion via variable"
       linters:
         - gosec
-    # Exclude specific gosec issues in main code
-    - text: "G304: Potential file inclusion via variable"
+      path: _test\.go$
+    - text: "should have a package comment"
       linters:
-        - gosec
+        - revive
+    - text: "Error return value of .+Close. is not checked"
+      path: _test\.go$
+      linters:
+        - errcheck
   exclude-use-default: false
