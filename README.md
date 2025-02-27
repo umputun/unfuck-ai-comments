@@ -46,44 +46,59 @@ go install github.com/umputun/unai-comments@latest
 
 ## Usage
 
+The tool now uses subcommands for different operations:
+
+```
+unfuck-ai-comments [options] <command> [file-patterns...]
+```
+
+Available commands:
+- `run`: Process files in place (default)
+- `diff`: Show diff without modifying files
+- `print`: Print processed content to stdout
+
 Process all .go files in the current directory:
 ```
-unfuck-ai-comments
+unfuck-ai-comments run
 ```
 
 Process a specific file:
 ```
-unfuck-ai-comments file.go
+unfuck-ai-comments run file.go
 ```
 
 Process all .go files recursively:
 ```
-unfuck-ai-comments ./...
+unfuck-ai-comments run ./...
 ```
 
 Show what would be changed without modifying files:
 ```
-unfuck-ai-comments -dry-run ./...
+unfuck-ai-comments diff ./...
 ```
 
 ## Options
 
-- `-output=inplace`: Modify files in place (default)
-- `-output=print`: Print modified file to stdout
-- `-output=diff`: Show diff output
-- `-dry-run`: Same as `-output=diff`
-- `-help`: Show usage information
+- `--no-color`: Disable colorized output
+- `--verbose` or `-v`: Show verbose output
+- `--dry`: Don't modify files, just show what would be changed (shortcut for diff command)
+- `--help` or `-h`: Show usage information
 
 ## Examples
 
 Show diff for all Go files in the current directory:
 ```
-unfuck-ai-comments -output=diff
+unfuck-ai-comments diff .
+```
+
+Print the modified content to stdout:
+```
+unfuck-ai-comments print file.go
 ```
 
 Process all Go files recursively and modify them:
 ```
-unfuck-ai-comments ./...
+unfuck-ai-comments run ./...
 ```
 
 ## How it works

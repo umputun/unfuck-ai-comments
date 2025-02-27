@@ -1,7 +1,7 @@
 package main
 
 import (
-	"flag"
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/format"
@@ -13,53 +13,95 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
+	"github.com/jessevdk/go-flags"
 )
 
-// replace os.Exit with a variable for testing
-var osExit = os.Exit
+// Options holds command line options
+type Options struct {
+	Run	struct {
+		Args struct {
+			Patterns []string `positional-arg-name:"FILE/PATTERN" description:"Files or patterns to process (default: current directory)"`
+		} `positional-args:"yes"`
+	}	`command:"run" description:"Process files in-place (default)"`
+
+	Diff	struct {
+		Args struct {
+			Patterns []string `positional-arg-name:"FILE/PATTERN" description:"Files or patterns to process (default: current directory)"`
+		} `positional-args:"yes"`
+	}	`command:"diff" description:"Show diff without modifying files"`
+
+	Print	struct {
+		Args struct {
+			Patterns []string `positional-arg-name:"FILE/PATTERN" description:"Files or patterns to process (default: current directory)"`
+		} `positional-args:"yes"`
+	}	`command:"print" description:"Print processed content to stdout"`
+
+	NoColor	bool	`long:"no-color" description:"Disable colorized output"`
+	Verbose	bool	`short:"v" long:"verbose" description:"Show verbose output"`
+	DryRun	bool	`long:"dry" description:"Don't modify files, just show what would be changed"`
+}
+
+var osExit = os.Exit	// replace os.Exit with a variable for testing
 
 func main() {
-	// define command line flags
-	outputMode := flag.String("output", "inplace", "Output mode: inplace, print, diff")
-	dryRun := flag.Bool("dry-run", false, "Don't modify files, just show what would be changed")
-	showHelp := flag.Bool("help", false, "Show usage information")
-	noColor := flag.Bool("no-color", false, "Disable colorized output")
-	flag.Parse()
+	// sefine options
+	var opts Options
+	p := flags.NewParser(&opts, flags.Default)
 
-	// enable colors by default
-	color.NoColor = *noColor
+	// add description and usage
+	p.LongDescription = "Convert in-function comments to lowercase while preserving comments outside functions"
 
-	// if dry-run is set, override output mode to diff
-	if *dryRun {
-		*outputMode = "diff"
+	// handle parsing errors
+	if _, err := p.Parse(); err != nil {
+		var flagsErr *flags.Error
+		if errors.As(err, &flagsErr) && errors.Is(flagsErr.Type, flags.ErrHelp) {
+			osExit(0)
+		}
+		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
+		osExit(1)
 	}
 
-	// show help if requested
-	if *showHelp {
-		fmt.Println("unfuck-ai-comments - Convert in-function comments to lowercase")
-		fmt.Println("\nUsage:")
-		fmt.Println("  unfuck-ai-comments [options] [file/pattern...]")
-		fmt.Println("\nOptions:")
-		flag.PrintDefaults()
-		fmt.Println("\nExamples:")
-		fmt.Println("  unfuck-ai-comments                       # Process all .go files in current directory")
-		fmt.Println("  unfuck-ai-comments file.go               # Process specific file")
-		fmt.Println("  unfuck-ai-comments ./...                 # Process all .go files recursively")
-		fmt.Println("  unfuck-ai-comments -output=print file.go # Print modified file to stdout")
-		fmt.Println("  unfuck-ai-comments -output=diff *.go     # Show diff for all .go files")
-		osExit(0)
+	// enable/disable colors
+	color.NoColor = opts.NoColor
+
+	// determine the mode based on command or flags
+	mode := "inplace"	// default
+
+	var args []string
+	// process according to command or flags
+	if p.Command.Active != nil {
+		// command was specified
+		switch p.Command.Active.Name {
+		case "run":
+			mode = "inplace"
+			args = opts.Run.Args.Patterns
+		case "diff":
+			mode = "diff"
+			args = opts.Diff.Args.Patterns
+		case "print":
+			mode = "print"
+			args = opts.Print.Args.Patterns
+		}
 	}
 
-	// get files to process
-	patterns := []string{"."}
-	if flag.NArg() > 0 {
-		patterns = flag.Args()
+	if opts.DryRun {
+		mode = "diff"
+		args = opts.Run.Args.Patterns
 	}
 
 	// process each pattern
-	for _, pattern := range patterns {
-		processPattern(pattern, *outputMode)
+	for _, pattern := range patterns(args) {
+		processPattern(pattern, mode)
 	}
+}
+
+func patterns(p []string) []string {
+	// get patterns to process, defaulting to current directory
+	patterns := p
+	if len(patterns) == 0 {
+		patterns = []string{"."}
+	}
+	return patterns
 }
 
 func processPattern(pattern, outputMode string) {

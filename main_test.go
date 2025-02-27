@@ -904,13 +904,13 @@ func Example2() {
 	require.NoError(t, err, "Failed to build CLI tool")
 
 	// run the integration tests
-	t.Run("inplace mode", func(t *testing.T) {
+	t.Run("run command", func(t *testing.T) {
 		// reset the file before test
 		err = os.WriteFile(testFile, []byte(testCode), 0o600)
 		require.NoError(t, err, "Failed to reset test file")
 
 		// run the tool
-		cmd := exec.Command(filepath.Join(tempDir, "unfuck-ai-comments"), testFile)
+		cmd := exec.Command(filepath.Join(tempDir, "unfuck-ai-comments"), "run", testFile)
 		var stdout, stderr bytes.Buffer
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
@@ -931,13 +931,13 @@ func Example2() {
 		assert.Contains(t, modified, "// another comment", "Did not properly convert comment in second function")
 	})
 
-	t.Run("dry-run mode", func(t *testing.T) {
+	t.Run("diff command", func(t *testing.T) {
 		// reset the file before test
 		err = os.WriteFile(testFile, []byte(testCode), 0o600)
 		require.NoError(t, err, "Failed to reset test file")
 
 		// run the tool with dry-run
-		cmd := exec.Command(filepath.Join(tempDir, "unfuck-ai-comments"), "-dry-run", testFile)
+		cmd := exec.Command(filepath.Join(tempDir, "unfuck-ai-comments"), "diff", testFile)
 		var stdout, stderr bytes.Buffer
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
@@ -954,12 +954,12 @@ func Example2() {
 		// verify the file was not modified
 		unmodifiedBytes, err := os.ReadFile(testFile)
 		require.NoError(t, err, "Failed to read file")
-		assert.Equal(t, testCode, string(unmodifiedBytes), "Dry run modified the file, but it shouldn't have")
+		assert.Equal(t, testCode, string(unmodifiedBytes), "Diff command modified the file, but it shouldn't have")
 	})
 
 	t.Run("print mode", func(t *testing.T) {
 		// run the tool in print mode
-		cmd := exec.Command(filepath.Join(tempDir, "unfuck-ai-comments"), "-output=print", testFile)
+		cmd := exec.Command(filepath.Join(tempDir, "unfuck-ai-comments"), "print", testFile)
 		var stdout, stderr bytes.Buffer
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
