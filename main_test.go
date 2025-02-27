@@ -12,6 +12,7 @@ import (
 
 // TestIsCommentInsideFunction tests the core function that determines if a comment is inside a function body
 func TestIsCommentInsideFunction(t *testing.T) {
+	
 	// Define test source code containing comments in different locations
 	src := `package main
 
@@ -82,7 +83,7 @@ func ComplexFunc() {
 		for _, comment := range commentGroup.List {
 			inside := isCommentInsideFunction(fset, file, comment)
 			text := comment.Text
-			
+
 			// Check if classification is correct
 			switch {
 			case strings.Contains(text, "SHOULD be modified") && !inside:
@@ -449,4 +450,3 @@ func Test() {
 		}
 	})
 }
-
