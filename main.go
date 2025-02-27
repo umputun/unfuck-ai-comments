@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/fatih/color"
 )
 
 func main() {
@@ -17,7 +19,11 @@ func main() {
 	outputMode := flag.String("output", "inplace", "Output mode: inplace, print, diff")
 	dryRun := flag.Bool("dry-run", false, "Don't modify files, just show what would be changed")
 	showHelp := flag.Bool("help", false, "Show usage information")
+	noColor := flag.Bool("no-color", false, "Disable colorized output")
 	flag.Parse()
+	
+	// Enable colors by default
+	color.NoColor = *noColor
 	
 	// If dry-run is set, override output mode to diff
 	if *dryRun {
@@ -188,10 +194,13 @@ func processFile(fileName, outputMode string) {
 				return
 			}
 
-		fmt.Printf("--- %s (original)\n", fileName)
-		fmt.Printf("+++ %s (modified)\n", fileName)
-		// Very basic diff output - in a real implementation, use a proper diff library
-		fmt.Println(simpleDiff(string(origBytes), modifiedBytes.String()))
+		// Use cyan for file information
+		cyan := color.New(color.FgCyan, color.Bold).SprintFunc()
+		fmt.Printf("%s\n", cyan("--- "+fileName+" (original)"))
+		fmt.Printf("%s\n", cyan("+++ "+fileName+" (modified)"))
+		
+		// Print the diff with colors
+		fmt.Print(simpleDiff(string(origBytes), modifiedBytes.String()))
 	}
 }
 
@@ -235,22 +244,26 @@ func convertCommentToLowercase(comment string) string {
 	return comment
 }
 
-// simpleDiff creates a very basic diff output
+// simpleDiff creates a colorized diff output
 func simpleDiff(original, modified string) string {
 	origLines := strings.Split(original, "\n")
 	modLines := strings.Split(modified, "\n")
+	
+	// Set up colors - use bright versions for better visibility
+	red := color.New(color.FgRed, color.Bold).SprintFunc()
+	green := color.New(color.FgGreen, color.Bold).SprintFunc()
 	
 	var diff strings.Builder
 	
 	for i := 0; i < len(origLines) || i < len(modLines); i++ {
 		switch {
 		case i >= len(origLines):
-			diff.WriteString("+ " + modLines[i] + "\n")
+			diff.WriteString(green("+ " + modLines[i]) + "\n")
 		case i >= len(modLines):
-			diff.WriteString("- " + origLines[i] + "\n")
+			diff.WriteString(red("- " + origLines[i]) + "\n")
 		case origLines[i] != modLines[i]:
-			diff.WriteString("- " + origLines[i] + "\n")
-			diff.WriteString("+ " + modLines[i] + "\n")
+			diff.WriteString(red("- " + origLines[i]) + "\n")
+			diff.WriteString(green("+ " + modLines[i]) + "\n")
 		}
 	}
 	
