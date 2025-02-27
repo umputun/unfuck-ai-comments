@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"go/ast"
+	"go/format"
 	"go/parser"
 	"go/printer"
 	"go/token"
@@ -197,10 +198,25 @@ func processFile(fileName, outputMode string) {
 			return
 		}
 
+		// Format the original content with gofmt
+		formattedOrig, err := formatGoCode(string(origBytes))
+		if err != nil {
+			// If formatting fails, fall back to original
+			formattedOrig = string(origBytes)
+		}
+
+		// Generate modified content
 		var modifiedBytes strings.Builder
 		if err := printer.Fprint(&modifiedBytes, fset, node); err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating diff: %v\n", err)
 			return
+		}
+
+		// Format the modified content with gofmt
+		formattedMod, err := formatGoCode(modifiedBytes.String())
+		if err != nil {
+			// If formatting fails, fall back to unformatted
+			formattedMod = modifiedBytes.String()
 		}
 
 		// use cyan for file information
@@ -209,7 +225,7 @@ func processFile(fileName, outputMode string) {
 		fmt.Printf("%s\n", cyan("+++ "+fileName+" (modified)"))
 
 		// print the diff with colors
-		fmt.Print(simpleDiff(string(origBytes), modifiedBytes.String()))
+		fmt.Print(simpleDiff(formattedOrig, formattedMod))
 	}
 }
 
@@ -251,6 +267,15 @@ func convertCommentToLowercase(comment string) string {
 		return "/*" + strings.ToLower(content) + "*/"
 	}
 	return comment
+}
+
+// formatGoCode formats Go code using go/format.
+func formatGoCode(src string) (string, error) {
+	formatted, err := format.Source([]byte(src))
+	if err != nil {
+		return "", err
+	}
+	return string(formatted), nil
 }
 
 // simpleDiff creates a colorized diff output

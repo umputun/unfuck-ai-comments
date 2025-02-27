@@ -1,0 +1,4 @@
+coverage.*
+test_file.go
+unfuck-ai-comments
+coverage.*
