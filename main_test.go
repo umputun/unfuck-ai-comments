@@ -752,8 +752,8 @@ func Test() {
 		{"non-go file", filepath.Join(tempDir, "notgo.txt"), "diff", 0},
 		{"nonexistent file", filepath.Join(tempDir, "nonexistent.go"), "diff", 0},
 		{"nonexistent pattern", filepath.Join(tempDir, "*.nonexistent"), "diff", 0},
-		{"subdir1", subDir1, "diff", 0},                    // our implementation doesn't process plain dirs
-		{"subdir1 with slash", subDir1 + "/", "diff", 0},   // our implementation doesn't process dirs with slashes
+		{"subdir1", subDir1, "diff", 1},                    // processes directory with .go files
+		{"subdir1 with slash", subDir1 + "/", "diff", 1},   // processes directory with .go files
 		{"recursive pattern ./...", "./...", "inplace", 5}, // all go files (root.go, nocomment.go, sub1.go, sub2.go, nested.go)
 	}
 

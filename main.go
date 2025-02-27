@@ -81,26 +81,33 @@ func processPattern(pattern, outputMode string) {
 		return
 	}
 
-	// find all .go files matching the pattern
-	files, err := filepath.Glob(pattern)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error globbing pattern %s: %v\n", pattern, err)
-		return
+	// initialize files slice
+	var files []string
+
+	// first check if the pattern is a directory
+	fileInfo, err := os.Stat(pattern)
+	if err == nil && fileInfo.IsDir() {
+		// it's a directory, find go files in it
+		globPattern := filepath.Join(pattern, "*.go")
+		matches, err := filepath.Glob(globPattern)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error finding Go files in %s: %v\n", pattern, err)
+		}
+		if len(matches) > 0 {
+			files = matches
+		}
+	} else {
+		// not a directory, try as a glob pattern
+		files, err = filepath.Glob(pattern)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error globbing pattern %s: %v\n", pattern, err)
+			return
+		}
 	}
 
-	// if pattern isn't a glob pattern, try as directory
 	if len(files) == 0 {
-		// remove any trailing slash for consistency
-		cleanPattern := strings.TrimSuffix(pattern, "/")
-
-		fileInfo, err := os.Stat(cleanPattern)
-		if err == nil && fileInfo.IsDir() {
-			// process all go files in the directory
-			matches, _ := filepath.Glob(filepath.Join(cleanPattern, "*.go"))
-			if len(matches) > 0 {
-				files = append(files, matches...)
-			}
-		}
+		fmt.Printf("No Go files found matching pattern: %s\n", pattern)
+		return
 	}
 
 	// process each file
@@ -244,7 +251,7 @@ func isCommentInsideFunction(_ *token.FileSet, file *ast.File, comment *ast.Comm
 			// check if comment is inside function body
 			if fn.Body != nil && fn.Body.Lbrace <= commentPos && commentPos <= fn.Body.Rbrace {
 				insideFunc = true
-				return false // stop traversal
+				return false	// stop traversal
 			}
 		}
 		return true
