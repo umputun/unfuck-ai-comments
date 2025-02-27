@@ -112,54 +112,54 @@ func ComplexFunc() {
 // TestConvertCommentToLowercase tests the comment conversion function with various formats
 func TestConvertCommentToLowercase(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		expected string
+		name		string
+		input		string
+		expected	string
 	}{
 		{
-			name:     "single line comment",
-			input:    "// This SHOULD Be Converted",
-			expected: "// this should be converted",
+			name:		"single line comment",
+			input:		"// This SHOULD Be Converted",
+			expected:	"// this should be converted",
 		},
 		{
-			name:     "multi-line comment",
-			input:    "/* This SHOULD\nBe Converted */",
-			expected: "/* this should\nbe converted */",
+			name:		"multi-line comment",
+			input:		"/* This SHOULD\nBe Converted */",
+			expected:	"/* this should\nbe converted */",
 		},
 		{
-			name:     "preserve comment markers",
-			input:    "// UPPER case comment",
-			expected: "// upper case comment",
+			name:		"preserve comment markers",
+			input:		"// UPPER case comment",
+			expected:	"// upper case comment",
 		},
 		{
-			name:     "comment with special chars",
-			input:    "// Special: @#$%^&*()",
-			expected: "// special: @#$%^&*()",
+			name:		"comment with special chars",
+			input:		"// Special: @#$%^&*()",
+			expected:	"// special: @#$%^&*()",
 		},
 		{
-			name:     "comment with code example",
-			input:    "// Example: const X = 123",
-			expected: "// example: const x = 123",
+			name:		"comment with code example",
+			input:		"// Example: const X = 123",
+			expected:	"// example: const x = 123",
 		},
 		{
-			name:     "empty comment",
-			input:    "//",
-			expected: "//",
+			name:		"empty comment",
+			input:		"//",
+			expected:	"//",
 		},
 		{
-			name:     "comment with leading space",
-			input:    "//  Leading space",
-			expected: "//  leading space",
+			name:		"comment with leading space",
+			input:		"//  Leading space",
+			expected:	"//  leading space",
 		},
 		{
-			name:     "multi-line with indentation",
-			input:    "/*\n * Line 1\n * Line 2\n */",
-			expected: "/*\n * line 1\n * line 2\n */",
+			name:		"multi-line with indentation",
+			input:		"/*\n * Line 1\n * Line 2\n */",
+			expected:	"/*\n * line 1\n * line 2\n */",
 		},
 		{
-			name:     "not a comment",
-			input:    "const X = 1",
-			expected: "const X = 1", // should return unchanged
+			name:		"not a comment",
+			input:		"const X = 1",
+			expected:	"const X = 1",	// should return unchanged
 		},
 	}
 
@@ -497,11 +497,11 @@ func MultiLineDef(
 	}
 
 	expectedResults := map[string]bool{
-		"// Comment on the same line as function opening brace SHOULD be modified":     true,
-		"// Comment on the same line as function closing brace should NOT be modified": false,
-		"// Comment in parameter list should NOT be modified":                          false,
-		"// Inline comment in parameter list should NOT be modified":                   false,
-		"// This comment SHOULD be modified":                                           true,
+		"// Comment on the same line as function opening brace SHOULD be modified":	true,
+		"// Comment on the same line as function closing brace should NOT be modified":	false,
+		"// Comment in parameter list should NOT be modified":				false,
+		"// Inline comment in parameter list should NOT be modified":			false,
+		"// This comment SHOULD be modified":						true,
 	}
 
 	// check each comment's classification
@@ -581,9 +581,9 @@ func Generic[T any](param T) {
 	}
 
 	expectedResults := map[string]bool{
-		"// Generic function comment should NOT be modified": false,
-		"// INSIDE generic function should be modified":      true,
-		"// Another comment to modify":                       true,
+		"// Generic function comment should NOT be modified":	false,
+		"// INSIDE generic function should be modified":	true,
+		"// Another comment to modify":				true,
 	}
 
 	// check each comment's classification
@@ -617,16 +617,16 @@ func TestUnicodeInComments(t *testing.T) {
 // TestMultiByteComments tests handling of emojis and other multi-byte characters
 func TestMultiByteComments(t *testing.T) {
 	tests := []struct {
-		input    string
-		expected string
+		input		string
+		expected	string
 	}{
 		{
-			input:    "// EMOJI TEST: 😀 😃 😄 👍",
-			expected: "// emoji test: 😀 😃 😄 👍",
+			input:		"// EMOJI TEST: 😀 😃 😄 👍",
+			expected:	"// emoji test: 😀 😃 😄 👍",
 		},
 		{
-			input:    "// MIXED CASE with EMOJI: Hello 👋 World",
-			expected: "// mixed case with emoji: hello 👋 world",
+			input:		"// MIXED CASE with EMOJI: Hello 👋 World",
+			expected:	"// mixed case with emoji: hello 👋 world",
 		},
 	}
 
@@ -694,7 +694,7 @@ func Test() {
 func Test() {
 	x := 1 // No uppercase here
 }`,
-		filepath.Join(tempDir, "notgo.txt"): `This is not a Go file`,
+		filepath.Join(tempDir, "notgo.txt"):	`This is not a Go file`,
 	}
 
 	for file, content := range testFiles {
@@ -742,19 +742,19 @@ func Test() {
 
 	// test cases for pattern matching
 	testCases := []struct {
-		name          string
-		pattern       string
-		mode          string
-		expectMatches int
+		name		string
+		pattern		string
+		mode		string
+		expectMatches	int
 	}{
 		{"single file", filepath.Join(tempDir, "root.go"), "diff", 1},
-		{"specific glob", filepath.Join(tempDir, "*.go"), "diff", 2}, // root.go, nocomment.go
+		{"specific glob", filepath.Join(tempDir, "*.go"), "diff", 2},	// root.go, nocomment.go
 		{"non-go file", filepath.Join(tempDir, "notgo.txt"), "diff", 0},
 		{"nonexistent file", filepath.Join(tempDir, "nonexistent.go"), "diff", 0},
 		{"nonexistent pattern", filepath.Join(tempDir, "*.nonexistent"), "diff", 0},
-		{"subdir1", subDir1, "diff", 1},                    // processes directory with .go files
-		{"subdir1 with slash", subDir1 + "/", "diff", 1},   // processes directory with .go files
-		{"recursive pattern ./...", "./...", "inplace", 5}, // all go files (root.go, nocomment.go, sub1.go, sub2.go, nested.go)
+		{"subdir1", subDir1, "diff", 1},			// processes directory with .go files
+		{"subdir1 with slash", subDir1 + "/", "diff", 1},	// processes directory with .go files
+		{"recursive pattern ./...", "./...", "inplace", 5},	// all go files (root.go, nocomment.go, sub1.go, sub2.go, nested.go)
 	}
 
 	for _, tc := range testCases {
@@ -791,52 +791,52 @@ func Test() {
 // TestSimpleDiff tests the diff generation functionality
 func TestSimpleDiff(t *testing.T) {
 	testCases := []struct {
-		name     string
-		original string
-		modified string
-		expected []string // strings that should appear in the diff output
+		name		string
+		original	string
+		modified	string
+		expected	[]string	// strings that should appear in the diff output
 	}{
 		{
-			name:     "identical strings",
-			original: "line 1\nline 2\nline 3",
-			modified: "line 1\nline 2\nline 3",
-			expected: []string{}, // no diff output expected for identical strings
+			name:		"identical strings",
+			original:	"line 1\nline 2\nline 3",
+			modified:	"line 1\nline 2\nline 3",
+			expected:	[]string{},	// no diff output expected for identical strings
 		},
 		{
-			name:     "add line",
-			original: "line 1\nline 2",
-			modified: "line 1\nline 2\nline 3",
-			expected: []string{"+ line 3"},
+			name:		"add line",
+			original:	"line 1\nline 2",
+			modified:	"line 1\nline 2\nline 3",
+			expected:	[]string{"+ line 3"},
 		},
 		{
-			name:     "remove line",
-			original: "line 1\nline 2\nline 3",
-			modified: "line 1\nline 3",
-			expected: []string{"- line 2"},
+			name:		"remove line",
+			original:	"line 1\nline 2\nline 3",
+			modified:	"line 1\nline 3",
+			expected:	[]string{"- line 2"},
 		},
 		{
-			name:     "change line",
-			original: "line 1\noriginal line\nline 3",
-			modified: "line 1\nmodified line\nline 3",
-			expected: []string{"- original line", "+ modified line"},
+			name:		"change line",
+			original:	"line 1\noriginal line\nline 3",
+			modified:	"line 1\nmodified line\nline 3",
+			expected:	[]string{"- original line", "+ modified line"},
 		},
 		{
-			name:     "multiple changes",
-			original: "line 1\noriginal line\nto be removed\nline 4",
-			modified: "line 1\nmodified line\nnew line\nline 4",
-			expected: []string{"- original line", "+ modified line", "- to be removed", "+ new line"},
+			name:		"multiple changes",
+			original:	"line 1\noriginal line\nto be removed\nline 4",
+			modified:	"line 1\nmodified line\nnew line\nline 4",
+			expected:	[]string{"- original line", "+ modified line", "- to be removed", "+ new line"},
 		},
 		{
-			name:     "empty original",
-			original: "",
-			modified: "new content",
-			expected: []string{"+ new content"},
+			name:		"empty original",
+			original:	"",
+			modified:	"new content",
+			expected:	[]string{"+ new content"},
 		},
 		{
-			name:     "empty modified",
-			original: "old content",
-			modified: "",
-			expected: []string{"- old content"},
+			name:		"empty modified",
+			original:	"old content",
+			modified:	"",
+			expected:	[]string{"- old content"},
 		},
 	}
 
@@ -1119,14 +1119,14 @@ func Test() {
 
 	// test different pattern types
 	patternTests := []struct {
-		name          string
-		pattern       string
-		mode          string
-		expectedFiles int
+		name		string
+		pattern		string
+		mode		string
+		expectedFiles	int
 	}{
 		{"specific file", filepath.Join(tempDir, "file1.go"), "diff", 1},
 		{"glob pattern", filepath.Join(tempDir, "*.go"), "diff", 2},
-		{"recursive with dots", filepath.Join(tempDir, "..."), "diff", 3}, // all .go files in tempdir and subdirs
+		{"recursive with dots", filepath.Join(tempDir, "..."), "diff", 3},	// all .go files in tempdir and subdirs
 	}
 
 	for _, tc := range patternTests {
@@ -1149,13 +1149,11 @@ func Test() {
 // TestProcessPatternErrors tests error handling in the processPattern function
 func TestProcessPatternErrors(t *testing.T) {
 	// create a temporary directory for test files
-	tempDir, err := os.MkdirTemp("", "unfuck-ai-comments-pattern-errors")
-	require.NoError(t, err, "Failed to create temp dir")
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()	// automatically cleaned up when the test finishes
 
 	// create a test file
 	testFile := filepath.Join(tempDir, "test.go")
-	err = os.WriteFile(testFile, []byte(`package test
+	err := os.WriteFile(testFile, []byte(`package test
 func Test() {
 	// TEST comment
 }`), 0o644)
@@ -1176,7 +1174,7 @@ func Test() {
 		os.Stderr = w
 
 		// process with invalid pattern
-		processPattern("[", "diff") // invalid glob pattern
+		processPattern("[", "diff")	// invalid glob pattern
 
 		// restore stderr
 		w.Close()
@@ -1210,7 +1208,7 @@ func Test() {
 		assert.Contains(t, output, "Error walking directory", "Should output error message for nonexistent directory")
 	})
 
-	if inaccessibleDir != "" && os.Getuid() != 0 { // skip if running as root
+	if inaccessibleDir != "" && os.Getuid() != 0 {	// skip if running as root
 		// test with inaccessible directory
 		t.Run("inaccessible directory", func(t *testing.T) {
 			// capture stderr
@@ -1239,14 +1237,12 @@ func Test() {
 // TestProcessFileComprehensive tests all branches of the processFile function
 func TestProcessFileComprehensive(t *testing.T) {
 	// create a temporary directory
-	tempDir, err := os.MkdirTemp("", "unfuck-ai-comments-file-comprehensive")
-	require.NoError(t, err, "Failed to create temp dir")
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()	// automatically cleaned up when the test finishes
 
 	// create test files with different scenarios
 	// 1. file with no comments to modify
 	noCommentsFile := filepath.Join(tempDir, "no_comments.go")
-	err = os.WriteFile(noCommentsFile, []byte(`package test
+	err := os.WriteFile(noCommentsFile, []byte(`package test
 func Test() {
 	x := 1 // already lowercase comment
 }`), 0o644)
@@ -1312,17 +1308,17 @@ func Test() {
 
 	// define tests
 	tests := []struct {
-		name        string
-		file        string
-		outputMode  string
-		checkStdout func(string)
-		checkStderr func(string)
-		checkFile   func(string, string)
+		name		string
+		file		string
+		outputMode	string
+		checkStdout	func(string)
+		checkStderr	func(string)
+		checkFile	func(string, string)
 	}{
 		{
-			name:       "inplace mode - no comments to modify",
-			file:       noCommentsFile,
-			outputMode: "inplace",
+			name:		"inplace mode - no comments to modify",
+			file:		noCommentsFile,
+			outputMode:	"inplace",
 			checkStdout: func(out string) {
 				assert.Empty(t, out, "No output expected when no changes needed")
 			},
@@ -1336,9 +1332,9 @@ func Test() {
 			},
 		},
 		{
-			name:       "inplace mode - with comments to modify",
-			file:       withCommentsFile,
-			outputMode: "inplace",
+			name:		"inplace mode - with comments to modify",
+			file:		withCommentsFile,
+			outputMode:	"inplace",
 			checkStdout: func(out string) {
 				assert.Contains(t, out, "Updated:", "Should report file was updated")
 			},
@@ -1354,9 +1350,9 @@ func Test() {
 			},
 		},
 		{
-			name:       "parse error",
-			file:       badSyntaxFile,
-			outputMode: "inplace",
+			name:		"parse error",
+			file:		badSyntaxFile,
+			outputMode:	"inplace",
 			checkStdout: func(out string) {
 				assert.Empty(t, out, "No output expected for parse error")
 			},
@@ -1370,9 +1366,9 @@ func Test() {
 			},
 		},
 		{
-			name:       "diff mode",
-			file:       withCommentsFile,
-			outputMode: "diff",
+			name:		"diff mode",
+			file:		withCommentsFile,
+			outputMode:	"diff",
 			checkStdout: func(out string) {
 				assert.Contains(t, out, "---", "Should show diff header")
 				assert.Contains(t, out, "+++", "Should show diff header")
@@ -1389,9 +1385,9 @@ func Test() {
 			},
 		},
 		{
-			name:       "print mode",
-			file:       withCommentsFile,
-			outputMode: "print",
+			name:		"print mode",
+			file:		withCommentsFile,
+			outputMode:	"print",
 			checkStdout: func(out string) {
 				assert.Contains(t, out, "// this should be converted", "Should print modified file")
 				assert.Contains(t, out, "// another comment", "Should print all modified comments")
@@ -1406,9 +1402,9 @@ func Test() {
 			},
 		},
 		{
-			name:       "no modifications needed",
-			file:       noModsNeededFile,
-			outputMode: "inplace",
+			name:		"no modifications needed",
+			file:		noModsNeededFile,
+			outputMode:	"inplace",
 			checkStdout: func(out string) {
 				assert.Empty(t, out, "No output expected when no changes needed")
 			},
@@ -1422,9 +1418,9 @@ func Test() {
 			},
 		},
 		{
-			name:       "invalid output mode",
-			file:       withCommentsFile,
-			outputMode: "invalid",
+			name:		"invalid output mode",
+			file:		withCommentsFile,
+			outputMode:	"invalid",
 			checkStdout: func(out string) {
 				assert.Empty(t, out, "No output expected for invalid mode")
 			},
@@ -1468,9 +1464,7 @@ func Test() {
 // TestErrorsInProcessFile tests error handling paths in processFile
 func TestErrorsInProcessFile(t *testing.T) {
 	// create a temporary directory for test files
-	tempDir, err := os.MkdirTemp("", "unfuck-ai-comments-errors")
-	require.NoError(t, err, "Failed to create temp dir")
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()	// automatically cleaned up when the test finishes
 
 	// capture both stdout and stderr during tests
 	captureOutput := func(fn func()) (string, string) {
@@ -1531,7 +1525,7 @@ func Test() {
 
 	// create a test file with comments to modify
 	testFile := filepath.Join(tempDir, "testfile.go")
-	err = os.WriteFile(testFile, []byte(`package test
+	err := os.WriteFile(testFile, []byte(`package test
 func Test() {
 	// THIS COMMENT should be modified
 }`), 0o644)
@@ -1550,7 +1544,7 @@ func Test() {
 		require.NoError(t, err, "Failed to write read-only file")
 
 		// make sure it's actually read-only
-		if runtime.GOOS != "windows" { // skip chmod tests on windows
+		if runtime.GOOS != "windows" {	// skip chmod tests on windows
 			// we need to make the file read-only but allow opening for writing
 			// on unix, we can make a file read-only
 			err = os.Chmod(readOnlyFile, 0o400)
@@ -1576,7 +1570,7 @@ func Test() {
 		oldStdout := os.Stdout
 		_, w, _ := os.Pipe()
 		os.Stdout = w
-		w.Close() // force error by closing the pipe
+		w.Close()	// force error by closing the pipe
 
 		// capture stderr
 		oldStderr := os.Stderr
@@ -1603,7 +1597,7 @@ func Test() {
 	// test diff mode with error reading original file
 	t.Run("diff mode with read error", func(t *testing.T) {
 		// create a non-readable file for testing
-		if runtime.GOOS != "windows" { // skip chmod tests on windows
+		if runtime.GOOS != "windows" {	// skip chmod tests on windows
 			nonReadableFile := filepath.Join(tempDir, "nonreadable.go")
 			err := os.WriteFile(nonReadableFile, []byte(`package test
 func Test() {
@@ -1666,10 +1660,10 @@ func Test() {
 
 	// create test files
 	files := map[string]bool{
-		filepath.Join(tempDir, "root.go"):           true,  // should be processed
-		filepath.Join(subDir, "sub.go"):             true,  // should be processed
-		filepath.Join(vendorDir, "vendor.go"):       false, // should be skipped (in vendor)
-		filepath.Join(nestedVendorDir, "nested.go"): false, // should be skipped (in nested vendor)
+		filepath.Join(tempDir, "root.go"):		true,	// should be processed
+		filepath.Join(subDir, "sub.go"):		true,	// should be processed
+		filepath.Join(vendorDir, "vendor.go"):		false,	// should be skipped (in vendor)
+		filepath.Join(nestedVendorDir, "nested.go"):	false,	// should be skipped (in nested vendor)
 	}
 
 	for file := range files {
@@ -1971,52 +1965,52 @@ func Test() {
 
 	// test cases
 	tests := []struct {
-		name       string
-		outputMode string
-		dryRun     bool
-		showHelp   bool
-		noColor    bool
-		patterns   []string
-		verify     func(string)
+		name		string
+		outputMode	string
+		dryRun		bool
+		showHelp	bool
+		noColor		bool
+		patterns	[]string
+		verify		func(string)
 	}{
 		{
-			name:     "help flag",
-			showHelp: true,
+			name:		"help flag",
+			showHelp:	true,
 			verify: func(output string) {
 				assert.Equal(t, "help displayed", output, "Help should be displayed")
 			},
 		},
 		{
-			name:     "dry run flag",
-			dryRun:   true,
-			patterns: []string{testFile},
+			name:		"dry run flag",
+			dryRun:		true,
+			patterns:	[]string{testFile},
 			verify: func(output string) {
 				assert.Contains(t, output, "---", "Dry run should show diff")
 				assert.Contains(t, output, "+++", "Dry run should show diff")
 			},
 		},
 		{
-			name:       "no color flag",
-			noColor:    true,
-			outputMode: "diff",
-			patterns:   []string{testFile},
+			name:		"no color flag",
+			noColor:	true,
+			outputMode:	"diff",
+			patterns:	[]string{testFile},
 			verify: func(output string) {
 				assert.True(t, color.NoColor, "NoColor should be true")
 			},
 		},
 		{
-			name:       "default directory",
-			outputMode: "inplace",
-			patterns:   []string{},
+			name:		"default directory",
+			outputMode:	"inplace",
+			patterns:	[]string{},
 			verify: func(output string) {
 				// this might be empty if no .go files in current dir, or might show files processed
 				// just ensuring it doesn't crash
 			},
 		},
 		{
-			name:       "explicit file",
-			outputMode: "inplace",
-			patterns:   []string{testFile},
+			name:		"explicit file",
+			outputMode:	"inplace",
+			patterns:	[]string{testFile},
 			verify: func(output string) {
 				assert.Contains(t, output, "Updated:", "Should report file was updated")
 			},
