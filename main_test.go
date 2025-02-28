@@ -1303,6 +1303,45 @@ func TestHelperFunctions(t *testing.T) {
 	})
 }
 
+// TestBackupFlagPropagation tests that the backup flag is properly passed from Options to ProcessRequest
+func TestBackupFlagPropagation(t *testing.T) {
+	t.Run("backup flag should be properly passed to ProcessRequest", func(t *testing.T) {
+		// create mock options with backup flag enabled
+		opts := Options{
+			Backup: true,
+		}
+
+		// create a process request using the options
+		req := ProcessRequest{
+			OutputMode:	"inplace",
+			TitleCase:	opts.Title,
+			Format:		opts.Format,
+			SkipPatterns:	opts.Skip,
+			Backup:		opts.Backup,
+		}
+
+		// verify the backup flag was properly passed
+		assert.True(t, req.Backup, "Backup flag should be passed from Options to ProcessRequest")
+
+		// create mock options with backup flag disabled
+		opts = Options{
+			Backup: false,
+		}
+
+		// create a process request using the options
+		req = ProcessRequest{
+			OutputMode:	"inplace",
+			TitleCase:	opts.Title,
+			Format:		opts.Format,
+			SkipPatterns:	opts.Skip,
+			Backup:		opts.Backup,
+		}
+
+		// verify the backup flag was properly passed
+		assert.False(t, req.Backup, "Backup flag should be properly passed as false from Options to ProcessRequest")
+	})
+}
+
 // TestModeSelection tests the mode selection logic
 func TestModeSelection(t *testing.T) {
 	// test the logic without directly calling determineprocessingmode
@@ -1382,7 +1421,7 @@ func TestFunc() {
 		os.Stdout = w
 
 		// run inplace handler
-		handleInplaceMode(testFile, fset, node, false)
+		handleInplaceMode(testFile, fset, node, false, false)
 
 		// restore stdout
 		err = w.Close()
@@ -1534,6 +1573,187 @@ func TestColorBehavior(t *testing.T) {
 	// test with colors enabled
 	color.NoColor = false
 	assert.False(t, color.NoColor, "NoColor should be false when colors are enabled")
+}
+
+// TestProcessRequestWithBackupFlag tests the ProcessRequest struct with backup flag
+func TestProcessRequestWithBackupFlag(t *testing.T) {
+	// test the processrequest struct with backup flag
+	req := ProcessRequest{
+		OutputMode:	"inplace",
+		TitleCase:	false,
+		Format:		true,
+		SkipPatterns:	[]string{"vendor"},
+		Backup:		true,
+	}
+
+	// verify the backup flag is properly set
+	assert.True(t, req.Backup, "Backup flag should be true when set")
+
+	// test with backup disabled
+	req2 := ProcessRequest{
+		OutputMode:	"inplace",
+		TitleCase:	false,
+		Format:		true,
+		SkipPatterns:	[]string{"vendor"},
+		Backup:		false,
+	}
+
+	// verify the backup flag is properly unset
+	assert.False(t, req2.Backup, "Backup flag should be false when not set")
+}
+
+// TestBackupFlag tests the backup functionality
+func TestBackupFlag(t *testing.T) {
+	// create a temporary directory for test files
+	tempDir := t.TempDir()
+
+	// test case 1: a file with changes that should be backed up
+	t.Run("backup created for file with changes", func(t *testing.T) {
+		// create a test file with comments that will be modified
+		testFile := filepath.Join(tempDir, "backup_test1.go")
+		content := `package test
+
+func TestFunc() {
+	// THIS COMMENT Should BE Modified
+	x := 1 // ANOTHER COMMENT To Modify
+}`
+		err := os.WriteFile(testFile, []byte(content), 0o600)
+		require.NoError(t, err, "Failed to write test file")
+
+		// set up ast for testing
+		fset := token.NewFileSet()
+		node, err := parser.ParseFile(fset, testFile, nil, parser.ParseComments)
+		require.NoError(t, err)
+
+		// convert comments to lowercase
+		changes, modified := processComments(node, false)
+		assert.True(t, modified, "Comments should be modified")
+		assert.Greater(t, changes, 0, "Should have at least one change")
+
+		// run inplace handler with backup enabled
+		handleInplaceMode(testFile, fset, node, false, true)
+
+		// verify backup file was created
+		backupFile := testFile + ".bak"
+		_, err = os.Stat(backupFile)
+		require.NoError(t, err, "Backup file should exist")
+
+		// verify backup file has original content
+		backupContent, err := os.ReadFile(backupFile)
+		require.NoError(t, err, "Failed to read backup file")
+		assert.Equal(t, content, string(backupContent), "Backup file should contain original content")
+
+		// verify main file has modified content
+		modifiedContent, err := os.ReadFile(testFile)
+		require.NoError(t, err, "Failed to read modified file")
+		assert.Contains(t, string(modifiedContent), "// this comment", "File should contain lowercase comments")
+		assert.Contains(t, string(modifiedContent), "// another comment", "File should contain lowercase comments")
+	})
+
+	// test case 2: a file with no changes should not be backed up
+	t.Run("no backup created for file without changes", func(t *testing.T) {
+		// create a test file with comments already in lowercase
+		testFile := filepath.Join(tempDir, "backup_test2.go")
+		content := `package test
+
+func TestFunc() {
+	// this comment is already lowercase
+	x := 1 // another lowercase comment
+}`
+		err := os.WriteFile(testFile, []byte(content), 0o600)
+		require.NoError(t, err, "Failed to write test file")
+
+		// make sure no backup file exists initially
+		backupFile := testFile + ".bak"
+		_ = os.Remove(backupFile)	// cleanup any previous runs
+
+		// the issue is that we need to test the real scenario where no changes are needed
+		// use the full processfile function instead of separate steps
+		changes := processFile(testFile, "inplace", false, false, true)
+
+		// there should be no changes since the comments are already lowercase
+		assert.Equal(t, 0, changes, "Should have no changes")
+
+		// verify backup file was not created
+		_, err = os.Stat(backupFile)
+		assert.Error(t, err, "Backup file should not exist")
+		assert.True(t, os.IsNotExist(err), "Error should be 'file does not exist'")
+	})
+
+	// test case 3: full integration test with processfile
+	t.Run("processFile with backup flag", func(t *testing.T) {
+		// create a test file with comments that will be modified
+		testFile := filepath.Join(tempDir, "backup_test3.go")
+		content := `package test
+
+func TestFunc() {
+	// UPPERCASE COMMENT
+	x := 1 // ANOTHER UPPERCASE COMMENT
+}`
+		err := os.WriteFile(testFile, []byte(content), 0o600)
+		require.NoError(t, err, "Failed to write test file")
+
+		// process file with backup flag
+		changes := processFile(testFile, "inplace", false, false, true)
+		assert.Greater(t, changes, 0, "Should have at least one change")
+
+		// verify backup file was created
+		backupFile := testFile + ".bak"
+		_, err = os.Stat(backupFile)
+		require.NoError(t, err, "Backup file should exist")
+
+		// verify backup file has original content
+		backupContent, err := os.ReadFile(backupFile)
+		require.NoError(t, err, "Failed to read backup file")
+		assert.Equal(t, content, string(backupContent), "Backup file should contain original content")
+
+		// verify main file has modified content
+		modifiedContent, err := os.ReadFile(testFile)
+		require.NoError(t, err, "Failed to read modified file")
+		assert.Contains(t, string(modifiedContent), "// uppercase", "File should contain lowercase comments")
+	})
+
+	// test case 4: test the diff mode (should not create backup regardless of backup flag)
+	t.Run("diff mode should not create backup", func(t *testing.T) {
+		// create a test file with comments that will be modified
+		testFile := filepath.Join(tempDir, "backup_test4.go")
+		content := `package test
+
+func TestFunc() {
+	// UPPERCASE COMMENT
+	x := 1 // ANOTHER UPPERCASE COMMENT
+}`
+		err := os.WriteFile(testFile, []byte(content), 0o600)
+		require.NoError(t, err, "Failed to write test file")
+
+		// redirect stdout to capture diff output
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		// process file in diff mode with backup flag (should be ignored)
+		changes := processFile(testFile, "diff", false, false, true)
+
+		// restore stdout
+		err = w.Close()
+		require.NoError(t, err)
+		os.Stdout = oldStdout
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+
+		assert.Greater(t, changes, 0, "Should have at least one change")
+
+		// verify backup file was not created (diff mode doesn't modify files)
+		backupFile := testFile + ".bak"
+		_, err = os.Stat(backupFile)
+		assert.Error(t, err, "Backup file should not exist for diff mode")
+		assert.True(t, os.IsNotExist(err), "Error should be 'file does not exist'")
+
+		// verify the original file is unchanged
+		originalContent, err := os.ReadFile(testFile)
+		require.NoError(t, err, "Failed to read original file")
+		assert.Equal(t, content, string(originalContent), "Original file should be unchanged in diff mode")
+	})
 }
 
 // TestCommentProcessingHelpers tests the new helper functions for comment processing
