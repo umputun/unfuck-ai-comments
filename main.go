@@ -252,7 +252,8 @@ func shouldSkip(path string, skipPatterns []string) bool {
 
 // runGoFmt runs gofmt on the specified file
 func runGoFmt(fileName string) {
-	cmd := exec.Command("gofmt", "-w", fileName)
+	// use gofmt with settings that preserve original formatting as much as possible
+	cmd := exec.Command("gofmt", "-w", "-s", fileName)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error running gofmt on %s: %v\n%s", fileName, err, output)
@@ -262,7 +263,7 @@ func runGoFmt(fileName string) {
 // formatWithGofmt formats the given content with gofmt
 // returns the original content if formatting fails
 func formatWithGofmt(content string) string {
-	cmd := exec.Command("gofmt")
+	cmd := exec.Command("gofmt", "-s")
 	cmd.Stdin = strings.NewReader(content)
 
 	// capture the stdout output
