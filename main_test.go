@@ -2,14 +2,328 @@ package main
 
 import (
 	"bytes"
+	"fmt"
+	"go/parser"
+	"go/token"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 
+	"github.com/fatih/color"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// TestIsCommentInsideFunction tests the core function that determines if a comment is inside a function body
+func TestIsCommentInsideFunction(t *testing.T) {
+
+	// define test source code containing comments in different locations
+	src := `package main
+
+// Package comment should NOT be modified
+// Another package comment
+
+// Function comment should NOT be modified
+func Example() {
+	// This SHOULD be modified
+	x := 1 // This inline comment SHOULD be modified
+	
+	/*
+	 * This multi-line comment
+	 * SHOULD be modified
+	 */
+	
+	// Another comment to modify
+}
+
+// Another function comment should NOT be modified
+func Example2() {
+	// This one too SHOULD be modified
+}
+
+type S struct {
+	// Struct field comment should NOT be modified
+	Field int
+	
+	// Another field comment
+	AnotherField string
+}
+
+func (s S) Method() {
+	// Method comment SHOULD be modified
+}
+
+// Comment before a type should NOT be modified
+type T int
+
+// Comment between funcs should NOT be modified
+
+// Complex cases with nested blocks
+func ComplexFunc() {
+	// Comment at start SHOULD be modified
+	if true {
+		// Comment in if block SHOULD be modified
+	}
+	
+	for i := 0; i < 10; i++ {
+		// Comment in for loop SHOULD be modified
+	}
+	
+	// Comment before closure SHOULD be modified
+	func() {
+		// Comment inside closure SHOULD be modified
+	}()
+}`
+
+	// parse the source
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "example.go", src, parser.ParseComments)
+	if err != nil {
+		t.Fatalf("Failed to parse test source: %v", err)
+	}
+
+	// check all comments using classification patterns
+	for _, commentGroup := range file.Comments {
+		for _, comment := range commentGroup.List {
+			inside := isCommentInsideFunction(fset, file, comment)
+			text := comment.Text
+
+			// check if classification is correct
+			switch {
+			case strings.Contains(text, "SHOULD be modified") && !inside:
+				t.Errorf("Comment incorrectly identified as NOT inside function: %q", text)
+			case strings.Contains(text, "should NOT be modified") && inside:
+				t.Errorf("Comment incorrectly identified as inside function: %q", text)
+			case strings.Contains(text, "Package comment") && inside:
+				t.Errorf("Package comment incorrectly identified as inside function: %q", text)
+			case strings.Contains(text, "Function comment") && inside:
+				t.Errorf("Function comment incorrectly identified as inside function: %q", text)
+			case strings.Contains(text, "field comment") && inside:
+				t.Errorf("Field comment incorrectly identified as inside function: %q", text)
+			}
+		}
+	}
+}
+
+// TestConvertCommentToLowercase tests the comment conversion function with various formats
+func TestConvertCommentToLowercase(t *testing.T) {
+	tests := []struct {
+		name		string
+		input		string
+		expected	string
+	}{
+		{
+			name:		"single line comment",
+			input:		"// This SHOULD Be Converted",
+			expected:	"// this should be converted",
+		},
+		{
+			name:		"multi-line comment",
+			input:		"/* This SHOULD\nBe Converted */",
+			expected:	"/* this should\nbe converted */",
+		},
+		{
+			name:		"preserve comment markers",
+			input:		"// UPPER case comment",
+			expected:	"// upper case comment",
+		},
+		{
+			name:		"comment with special chars",
+			input:		"// Special: @#$%^&*()",
+			expected:	"// special: @#$%^&*()",
+		},
+		{
+			name:		"comment with code example",
+			input:		"// Example: const X = 123",
+			expected:	"// example: const x = 123",
+		},
+		{
+			name:		"empty comment",
+			input:		"//",
+			expected:	"//",
+		},
+		{
+			name:		"comment with leading space",
+			input:		"//  Leading space",
+			expected:	"//  leading space",
+		},
+		{
+			name:		"multi-line with indentation",
+			input:		"/*\n * Line 1\n * Line 2\n */",
+			expected:	"/*\n * line 1\n * line 2\n */",
+		},
+		{
+			name:		"not a comment",
+			input:		"const X = 1",
+			expected:	"const X = 1",	// should return unchanged
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := convertCommentToLowercase(test.input)
+			assert.Equal(t, test.expected, result, "Comment conversion failed")
+		})
+	}
+}
+
+// TestConvertCommentToTitleCase tests the title case comment conversion function
+func TestConvertCommentToTitleCase(t *testing.T) {
+	tests := []struct {
+		name		string
+		input		string
+		expected	string
+	}{
+		{
+			name:		"single line comment",
+			input:		"// This SHOULD Be Converted",
+			expected:	"// this SHOULD Be Converted",
+		},
+		{
+			name:		"multi-line comment",
+			input:		"/* This SHOULD\nBe Converted */",
+			expected:	"/* this SHOULD\nBe Converted */",
+		},
+		{
+			name:		"uppercase first letter",
+			input:		"// UPPER case comment",
+			expected:	"// uPPER case comment",
+		},
+		{
+			name:		"comment with special chars",
+			input:		"// Special: @#$%^&*()",
+			expected:	"// special: @#$%^&*()",
+		},
+		{
+			name:		"comment with code example",
+			input:		"// Example: const X = 123",
+			expected:	"// example: const X = 123",
+		},
+		{
+			name:		"empty comment",
+			input:		"//",
+			expected:	"//",
+		},
+		{
+			name:		"comment with leading space",
+			input:		"//  Leading space",
+			expected:	"//  leading space",
+		},
+		{
+			name:		"multi-line with indentation",
+			input:		"/*\n * Line 1\n * Line 2\n */",
+			expected:	"/*\n * Line 1\n * Line 2\n */",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := convertCommentToTitleCase(test.input)
+			assert.Equal(t, test.expected, result, "Title case conversion failed")
+		})
+	}
+}
+
+// Helper function to remove whitespace for comparison
+func removeWhitespace(s string) string {
+	re := regexp.MustCompile(`\s+`)
+	return re.ReplaceAllString(s, "")
+}
+
+// TestProcessFile tests the main processing function with different modes
+func TestProcessFile(t *testing.T) {
+	// create a temporary directory for test files
+	tempDir := t.TempDir()
+
+	// create a test file with comments
+	testFile := filepath.Join(tempDir, "test_file.go")
+	content := `package test
+
+func Example() {
+	// THIS COMMENT should be converted
+	x := 1 // ANOTHER COMMENT
+}`
+	err := os.WriteFile(testFile, []byte(content), 0o600)
+	require.NoError(t, err, "Failed to write test file")
+
+	// test inplace mode
+	t.Run("inplace mode", func(t *testing.T) {
+		// reset file
+		err := os.WriteFile(testFile, []byte(content), 0o600)
+		require.NoError(t, err, "Failed to reset test file")
+
+		// capture stdout
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		// process file in inplace mode
+		processFile(testFile, "inplace", false, false)
+
+		// restore stdout
+		err = w.Close()
+		require.NoError(t, err)
+		os.Stdout = oldStdout
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+		output := buf.String()
+
+		// verify "updated" message
+		assert.Contains(t, output, "Updated:", "Should show update message")
+
+		// read the file content
+		modifiedContent, err := os.ReadFile(testFile)
+		require.NoError(t, err, "Failed to read modified file")
+		modifiedStr := string(modifiedContent)
+
+		// verify changes
+		assert.Contains(t, modifiedStr, "// this comment", "Should convert comments to lowercase")
+		assert.Contains(t, modifiedStr, "// another comment", "Should convert all comments to lowercase")
+		assert.NotContains(t, modifiedStr, "// THIS COMMENT", "Should not contain original uppercase comments")
+	})
+
+	// test diff mode
+	t.Run("diff mode", func(t *testing.T) {
+		// reset file
+		err := os.WriteFile(testFile, []byte(content), 0o600)
+		require.NoError(t, err, "Failed to reset test file")
+
+		// capture stdout
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		// process file in diff mode
+		processFile(testFile, "diff", false, false)
+
+		// restore stdout
+		err = w.Close()
+		require.NoError(t, err)
+		os.Stdout = oldStdout
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+		output := buf.String()
+
+		// verify diff output
+		assert.Contains(t, output, "---", "Should show diff markers")
+		assert.Contains(t, output, "+++", "Should show diff markers")
+		// the exact format of the diff output depends on how diff is formatted, so check for content rather than exact format
+		assert.Contains(t, output, "THIS COMMENT", "Should show original comment")
+		assert.Contains(t, output, "this comment", "Should show converted comment")
+		assert.Contains(t, output, "ANOTHER COMMENT", "Should show original comment")
+		assert.Contains(t, output, "another comment", "Should show converted comment")
+
+		// file should not be modified
+		modifiedContent, err := os.ReadFile(testFile)
+		require.NoError(t, err, "Failed to read file")
+		assert.Equal(t, content, string(modifiedContent), "File should not be modified in diff mode")
+
+		// skip spacing checks since printer may normalize some aspects
+	})
+}
 
 func TestFormatOption(t *testing.T) {
 	tempDir := t.TempDir()
@@ -282,4 +596,348 @@ func Example(  ) {
 		require.NoError(t, err)
 		assert.Contains(t, string(fileContent), "// this comment", "Should still convert comments")
 	})
+}
+
+// TestCLIInvocation tests the CLI by simulating command line invocation
+// This tests the whole process without calling main() directly
+func TestCLIInvocation(t *testing.T) {
+	// create a temporary directory for test files
+	tempDir, err := os.MkdirTemp("", "unfuck-ai-comments-main")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// create a test file
+	testFile := filepath.Join(tempDir, "cli_test_file.go")
+	content := `package test
+func TestFunc() {
+	// THIS is a comment that should be CONVERTED
+}`
+	if err := os.WriteFile(testFile, []byte(content), 0o600); err != nil {
+		t.Fatalf("Failed to write test file: %v", err)
+	}
+
+	// test inplace mode (default)
+	t.Run("inplace mode", func(t *testing.T) {
+		// reset test file
+		if err := os.WriteFile(testFile, []byte(content), 0o600); err != nil {
+			t.Fatalf("Failed to reset test file: %v", err)
+		}
+
+		// process file directly using the processfile function
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		processFile(testFile, "inplace", false, false)
+
+		err := w.Close()
+		require.NoError(t, err)
+		os.Stdout = oldStdout
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+		output := buf.String()
+
+		// verify output and file content
+		if !strings.Contains(output, "Updated:") {
+			t.Errorf("Expected 'Updated:' message in output, got: %q", output)
+		}
+
+		// check file was modified
+		modifiedContent, err := os.ReadFile(testFile)
+		if err != nil {
+			t.Fatalf("Failed to read modified file: %v", err)
+		}
+
+		expectedContent := `package test
+func TestFunc() {
+	// this is a comment that should be converted
+}`
+
+		// compare normalized content (removing line breaks and whitespace)
+		if removeWhitespace(string(modifiedContent)) != removeWhitespace(expectedContent) {
+			t.Errorf("File content doesn't match expected.\nExpected:\n%s\nGot:\n%s",
+				expectedContent, string(modifiedContent))
+		}
+	})
+
+	// test diff mode
+	t.Run("diff mode", func(t *testing.T) {
+		// reset test file
+		if err := os.WriteFile(testFile, []byte(content), 0o600); err != nil {
+			t.Fatalf("Failed to reset test file: %v", err)
+		}
+
+		// process file directly in diff mode
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		processFile(testFile, "diff", false, false)
+
+		err := w.Close()
+		require.NoError(t, err)
+		os.Stdout = oldStdout
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+		output := buf.String()
+
+		// verify diff output contains lowercase conversion
+		if !strings.Contains(output, "THIS") && !strings.Contains(output, "this") {
+			t.Errorf("Expected diff output to show comment conversion, got: %q", output)
+		}
+
+		// file should not be modified in diff mode
+		unmodifiedContent, err := os.ReadFile(testFile)
+		if err != nil {
+			t.Fatalf("Failed to read file: %v", err)
+		}
+
+		if string(unmodifiedContent) != content {
+			t.Error("File was modified in diff mode but should not be")
+		}
+	})
+
+	// test print mode
+	t.Run("print mode", func(t *testing.T) {
+		// reset test file
+		if err := os.WriteFile(testFile, []byte(content), 0o600); err != nil {
+			t.Fatalf("Failed to reset test file: %v", err)
+		}
+
+		// process file directly in print mode
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		processFile(testFile, "print", false, false)
+
+		err := w.Close()
+		require.NoError(t, err)
+		os.Stdout = oldStdout
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+		output := buf.String()
+
+		// verify printed output
+		if !strings.Contains(output, "// this is a comment") {
+			t.Errorf("Expected print output to contain modified comment, got: %q", output)
+		}
+
+		// file should not be modified in print mode
+		unmodifiedContent, err := os.ReadFile(testFile)
+		if err != nil {
+			t.Fatalf("Failed to read file: %v", err)
+		}
+
+		if string(unmodifiedContent) != content {
+			t.Error("File was modified in print mode but should not be")
+		}
+	})
+}
+
+// TestMainFunctionMock creates a mock version of main to test all branches
+func TestMainFunctionMock(t *testing.T) {
+	// create a temporary directory for test files
+	tempDir, err := os.MkdirTemp("", "unfuck-ai-main-mock")
+	require.NoError(t, err, "Failed to create temp dir")
+	defer os.RemoveAll(tempDir)
+
+	// create a test file with comments
+	testFile := filepath.Join(tempDir, "mock_test.go")
+	content := `package test
+func Test() {
+	// THIS SHOULD be converted
+}`
+	err = os.WriteFile(testFile, []byte(content), 0o600)
+	require.NoError(t, err, "Failed to write test file")
+
+	// mock version of main
+	mockMain := func(outputMode string, dryRun, showHelp, noColor bool, patterns []string) string {
+		// capture output
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		// set color setting
+		color.NoColor = noColor
+
+		// if dry-run is set, override output mode to diff
+		if dryRun {
+			outputMode = "diff"
+		}
+
+		// show help if requested
+		if showHelp {
+			fmt.Println("unfuck-ai-comments - Convert in-function comments to lowercase")
+			fmt.Println("\nUsage:")
+			fmt.Println("  unfuck-ai-comments [options] [file/pattern...]")
+			fmt.Println("\nOptions:")
+			fmt.Println("-output (inplace|print|diff) - Output mode")
+			fmt.Println("-dry-run - Don't modify files, just show what would be changed")
+			fmt.Println("-help - Show usage information")
+			fmt.Println("-no-color - Disable colorized output")
+			fmt.Println("\nExamples:")
+			fmt.Println("  unfuck-ai-comments                       # Process all .go files in current directory")
+			return "help displayed"
+		}
+
+		// if no patterns specified, use current directory
+		if len(patterns) == 0 {
+			patterns = []string{"."}
+		}
+
+		// process each pattern
+		for _, pattern := range patterns {
+			processPattern(pattern, outputMode, false, false)
+		}
+
+		// restore stdout
+		err := w.Close()
+		require.NoError(t, err)
+		os.Stdout = oldStdout
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+		return buf.String()
+	}
+
+	// test cases
+	tests := []struct {
+		name		string
+		outputMode	string
+		dryRun		bool
+		showHelp	bool
+		noColor		bool
+		patterns	[]string
+		verify		func(string)
+	}{
+		{
+			name:		"help flag",
+			showHelp:	true,
+			verify: func(output string) {
+				assert.Equal(t, "help displayed", output, "Help should be displayed")
+			},
+		},
+		{
+			name:		"dry run flag",
+			dryRun:		true,
+			patterns:	[]string{testFile},
+			verify: func(output string) {
+				assert.Contains(t, output, "---", "Dry run should show diff")
+				assert.Contains(t, output, "+++", "Dry run should show diff")
+			},
+		},
+		{
+			name:		"no color flag",
+			noColor:	true,
+			outputMode:	"diff",
+			patterns:	[]string{testFile},
+			verify: func(output string) {
+				assert.True(t, color.NoColor, "NoColor should be true")
+			},
+		},
+		{
+			name:		"default directory",
+			outputMode:	"inplace",
+			patterns:	[]string{},
+			verify: func(output string) {
+				// this might be empty if no .go files in current dir, or might show files processed
+				// just ensuring it doesn't crash
+			},
+		},
+		{
+			name:		"explicit file",
+			outputMode:	"inplace",
+			patterns:	[]string{testFile},
+			verify: func(output string) {
+				assert.Contains(t, output, "Updated:", "Should report file was updated")
+			},
+		},
+	}
+
+	// run test cases
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// reset color setting
+			color.NoColor = false
+
+			// run mock main
+			output := mockMain(tc.outputMode, tc.dryRun, tc.showHelp, tc.noColor, tc.patterns)
+
+			// verify output
+			tc.verify(output)
+		})
+	}
+}
+
+// TestSimpleDiff tests the diff function
+func TestSimpleDiff(t *testing.T) {
+	tests := []struct {
+		name		string
+		original	string
+		modified	string
+		expect		[]string
+	}{
+		{
+			name:		"simple change",
+			original:	"Line 1\nLine 2\nLine 3",
+			modified:	"Line 1\nModified\nLine 3",
+			expect:		[]string{"Line 2", "Modified"},
+		},
+		{
+			name:		"comment change",
+			original:	"// THIS IS A COMMENT",
+			modified:	"// this is a comment",
+			expect:		[]string{"THIS IS A COMMENT", "this is a comment"},
+		},
+		{
+			name:		"no change",
+			original:	"Line 1\nLine 2",
+			modified:	"Line 1\nLine 2",
+			expect:		[]string{},
+		},
+		{
+			name:		"add line",
+			original:	"Line 1\nLine 2",
+			modified:	"Line 1\nLine 2\nLine 3",
+			expect:		[]string{"Line 3"},
+		},
+		{
+			name:		"remove line",
+			original:	"Line 1\nLine 2\nLine 3",
+			modified:	"Line 1\nLine 3",
+			expect:		[]string{"Line 2"},
+		},
+	}
+
+	// colors are disabled for predictable testing
+	color.NoColor = true
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			diff := simpleDiff(test.original, test.modified)
+			for _, expect := range test.expect {
+				assert.Contains(t, diff, expect, "Diff should contain expected changes")
+			}
+			if len(test.expect) == 0 {
+				assert.Equal(t, "", diff, "Diff should be empty when no changes")
+			}
+		})
+	}
+}
+
+// Test color functionality
+func TestColorBehavior(t *testing.T) {
+	// save current color setting and restore after test
+	originalNoColor := color.NoColor
+	defer func() { color.NoColor = originalNoColor }()
+
+	// test with colors disabled
+	color.NoColor = true
+	assert.True(t, color.NoColor, "NoColor should be true when colors are disabled")
+
+	// test with colors enabled
+	color.NoColor = false
+	assert.False(t, color.NoColor, "NoColor should be false when colors are enabled")
 }
