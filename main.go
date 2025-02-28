@@ -7,6 +7,7 @@ import (
 	"go/parser"
 	"go/printer"
 	"go/token"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,102 +19,137 @@ import (
 	"github.com/jessevdk/go-flags"
 )
 
-//go:generate go run github.com/umputun/unfuck-ai-comments@latest run --title --fmt main.go main_test.go
+//go:generate go run github.com/umputun/unfuck-ai-comments@latest run --fmt main.go main_test.go
 
 // Options holds command line options
 type Options struct {
-	Run	struct {
+	Run struct {
 		Args struct {
 			Patterns []string `positional-arg-name:"FILE/PATTERN" description:"Files or patterns to process (default: current directory)"`
 		} `positional-args:"yes"`
-	}	`command:"run" description:"Process files in-place (default)"`
+	} `command:"run" description:"Process files in-place (default)"`
 
-	Diff	struct {
+	Diff struct {
 		Args struct {
 			Patterns []string `positional-arg-name:"FILE/PATTERN" description:"Files or patterns to process (default: current directory)"`
 		} `positional-args:"yes"`
-	}	`command:"diff" description:"Show diff without modifying files"`
+	} `command:"diff" description:"Show diff without modifying files"`
 
-	Print	struct {
+	Print struct {
 		Args struct {
 			Patterns []string `positional-arg-name:"FILE/PATTERN" description:"Files or patterns to process (default: current directory)"`
 		} `positional-args:"yes"`
-	}	`command:"print" description:"Print processed content to stdout"`
+	} `command:"print" description:"Print processed content to stdout"`
 
-	Title	bool		`long:"title" description:"Convert only the first character to lowercase, keep the rest unchanged (deprecated, now default behavior)"`
-	Full	bool		`long:"full" description:"Convert entire comment to lowercase, not just the first character"`
-	Skip	[]string	`long:"skip" description:"Skip specified directories or files (can be used multiple times)"`
-	Format	bool		`long:"fmt" description:"Run gofmt on processed files"`
-	Backup	bool		`long:"backup" description:"Create .bak backups of files that are modified"`
-	Version	bool		`short:"v" long:"version" description:"Show version information"`
+	Title   bool     `long:"title" description:"Convert only the first character to lowercase, keep the rest unchanged (deprecated, now default behavior)"`
+	Full    bool     `long:"full" description:"Convert entire comment to lowercase, not just the first character"`
+	Skip    []string `long:"skip" description:"Skip specified directories or files (can be used multiple times)"`
+	Format  bool     `long:"fmt" description:"Run gofmt on processed files"`
+	Backup  bool     `long:"backup" description:"Create .bak backups of files that are modified"`
+	Version bool     `short:"v" long:"version" description:"Show version information"`
 
-	DryRun	bool	`long:"dry" description:"Don't modify files, just show what would be changed"`
+	DryRun bool `long:"dry" description:"Don't modify files, just show what would be changed"`
 }
 
-var osExit = os.Exit	// replace os.Exit with a variable for testing
+// OutputWriters holds writers for stdout and stderr
+type OutputWriters struct {
+	Stdout io.Writer
+	Stderr io.Writer
+}
+
+// DefaultWriters returns the standard output writers (os.Stdout, os.Stderr)
+func DefaultWriters() OutputWriters {
+	return OutputWriters{
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+	}
+}
+
+// Define custom errors for special exit cases
+var (
+	ErrVersionRequested = errors.New("version info requested")
+	ErrHelpRequested    = errors.New("help requested")
+	ErrParsingFailed    = errors.New("parsing failed")
+)
 
 func main() {
+	// use default writers (os.Stdout, os.Stderr)
+	writers := DefaultWriters()
+
 	// parse command line options
-	opts, p := parseCommandLineOptions()
+	opts, p, err := parseCommandLineOptions(writers)
+
+	// handle special exit cases
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrVersionRequested) || errors.Is(err, ErrHelpRequested):
+			os.Exit(0)
+		case errors.Is(err, ErrParsingFailed):
+			os.Exit(1)
+		default:
+			fmt.Fprintf(writers.Stderr, "Error: %s\n", err)
+			os.Exit(1)
+		}
+	}
 
 	// determine mode and file patterns to process
 	mode, args := determineProcessingMode(opts, p)
 
 	// create process request with all options
 	req := ProcessRequest{
-		OutputMode:	mode,
-		TitleCase:	!opts.Full,	// title case is default, full resets it
-		Format:		opts.Format,
-		SkipPatterns:	opts.Skip,
-		Backup:		opts.Backup,
+		OutputMode:   mode,
+		TitleCase:    !opts.Full, // title case is default, full resets it
+		Format:       opts.Format,
+		SkipPatterns: opts.Skip,
+		Backup:       opts.Backup,
 	}
 
 	// process each pattern
 	for _, pattern := range patterns(args) {
-		processPattern(pattern, &req)
+		processPatternWithWriters(pattern, &req, writers)
 	}
 
 	// print summary for run and diff modes (not print mode)
 	if mode == "inplace" || mode == "diff" {
-		fmt.Printf("\nSummary: %d files analyzed, %d files updated, %d total changes\n",
+		fmt.Fprintf(writers.Stdout, "\nSummary: %d files analyzed, %d files updated, %d total changes\n",
 			req.FilesAnalyzed, req.FilesUpdated, req.TotalChanges)
 	}
 }
 
 // parseCommandLineOptions parses command line arguments and returns options
-func parseCommandLineOptions() (Options, *flags.Parser) {
+func parseCommandLineOptions(writers OutputWriters) (Options, *flags.Parser, error) {
 	var opts Options
 	p := flags.NewParser(&opts, flags.Default)
 	p.LongDescription = "Convert in-function comments to lowercase while preserving comments outside functions"
 
 	// check for standalone --version/-v flag before regular parsing
 	if len(os.Args) == 2 && (os.Args[1] == "-v" || os.Args[1] == "--version") {
-		showVersionInfo()
-		osExit(0)
+		showVersionInfo(writers.Stdout)
+		return opts, p, ErrVersionRequested
 	}
 
 	// handle parsing errors
 	if _, err := p.Parse(); err != nil {
 		var flagsErr *flags.Error
 		if errors.As(err, &flagsErr) && errors.Is(flagsErr.Type, flags.ErrHelp) {
-			osExit(0)
+			return opts, p, ErrHelpRequested
 		}
 
-		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
-		osExit(1)
+		fmt.Fprintf(writers.Stderr, "Error: %s\n", err)
+		return opts, p, ErrParsingFailed
 	}
 
 	// display version information if requested through the regular option
 	if opts.Version {
-		showVersionInfo()
-		osExit(0)
+		showVersionInfo(writers.Stdout)
+		return opts, p, ErrVersionRequested
 	}
 
-	return opts, p
+	return opts, p, nil
 }
 
 // showVersionInfo displays the version information from Go's build info
-func showVersionInfo() {
+func showVersionInfo(w io.Writer) {
 	if info, ok := debug.ReadBuildInfo(); ok {
 		version := info.Main.Version
 		if version == "" {
@@ -129,9 +165,9 @@ func showVersionInfo() {
 			}
 		}
 
-		fmt.Printf("unfuck-ai-comments %s%s\n", version, modified)
+		fmt.Fprintf(w, "unfuck-ai-comments %s%s\n", version, modified)
 	} else {
-		fmt.Println("unfuck-ai-comments (version information not available)")
+		fmt.Fprintln(w, "unfuck-ai-comments (version information not available)")
 	}
 }
 
@@ -174,31 +210,37 @@ func patterns(p []string) []string {
 
 // ProcessRequest contains all processing parameters
 type ProcessRequest struct {
-	OutputMode	string
-	TitleCase	bool
-	Format		bool
-	SkipPatterns	[]string
-	Backup		bool
+	OutputMode   string
+	TitleCase    bool
+	Format       bool
+	SkipPatterns []string
+	Backup       bool
 
 	// statistics for final summary
-	FilesAnalyzed	int
-	FilesUpdated	int
-	TotalChanges	int
+	FilesAnalyzed int
+	FilesUpdated  int
+	TotalChanges  int
 }
 
-// processPattern processes a single pattern
+// processPattern processes a single pattern using default writers
 func processPattern(pattern string, req *ProcessRequest) {
+	writers := DefaultWriters()
+	processPatternWithWriters(pattern, req, writers)
+}
+
+// processPatternWithWriters processes a single pattern
+func processPatternWithWriters(pattern string, req *ProcessRequest, writers OutputWriters) {
 	// handle recursive pattern cases
 	if isRecursivePattern(pattern) {
 		dir := extractDirectoryFromPattern(pattern)
-		walkDir(dir, req)
+		walkDirWithWriters(dir, req, writers)
 		return
 	}
 
 	// find files to process
 	files := findGoFilesFromPattern(pattern)
 	if len(files) == 0 {
-		fmt.Printf("No Go files found matching pattern: %s\n", pattern)
+		fmt.Fprintf(writers.Stdout, "No Go files found matching pattern: %s\n", pattern)
 		return
 	}
 
@@ -209,7 +251,7 @@ func processPattern(pattern string, req *ProcessRequest) {
 		}
 
 		req.FilesAnalyzed++
-		changes := processFile(file, req.OutputMode, req.TitleCase, req.Format, req.Backup)
+		changes := processFileWithWriters(file, req.OutputMode, req.TitleCase, req.Format, writers, req.Backup)
 
 		if changes > 0 {
 			req.FilesUpdated++
@@ -261,8 +303,14 @@ func findGoFilesFromPattern(pattern string) []string {
 	return files
 }
 
-// walkDir recursively processes all .go files in directory and subdirectories
+// walkDir recursively processes all .go files in directory and subdirectories using default writers
 func walkDir(dir string, req *ProcessRequest) {
+	writers := DefaultWriters()
+	walkDirWithWriters(dir, req, writers)
+}
+
+// walkDirWithWriters recursively processes all .go files in directory and subdirectories
+func walkDirWithWriters(dir string, req *ProcessRequest, writers OutputWriters) {
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -285,7 +333,7 @@ func walkDir(dir string, req *ProcessRequest) {
 			}
 
 			req.FilesAnalyzed++
-			changes := processFile(path, req.OutputMode, req.TitleCase, req.Format, req.Backup)
+			changes := processFileWithWriters(path, req.OutputMode, req.TitleCase, req.Format, writers, req.Backup)
 
 			if changes > 0 {
 				req.FilesUpdated++
@@ -295,7 +343,7 @@ func walkDir(dir string, req *ProcessRequest) {
 		return nil
 	})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error walking directory %s: %v\n", dir, err)
+		fmt.Fprintf(writers.Stderr, "Error walking directory %s: %v\n", dir, err)
 	}
 }
 
@@ -355,18 +403,25 @@ func formatWithGofmt(content string) string {
 	formattedBytes, err := cmd.Output()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error formatting with gofmt: %v\n", err)
-		return content	// return original content on error
+		return content // return original content on error
 	}
 
 	return string(formattedBytes)
 }
 
+// processFile processes a file using default writers
 func processFile(fileName, outputMode string, titleCase, format bool, backup ...bool) int {
+	writers := DefaultWriters()
+	return processFileWithWriters(fileName, outputMode, titleCase, format, writers, backup...)
+}
+
+// processFileWithWriters processes a file using custom writers
+func processFileWithWriters(fileName, outputMode string, titleCase, format bool, writers OutputWriters, backup ...bool) int {
 	// parse the file
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, fileName, nil, parser.ParseComments)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing %s: %v\n", fileName, err)
+		fmt.Fprintf(writers.Stderr, "Error parsing %s: %v\n", fileName, err)
 		return 0
 	}
 
@@ -385,11 +440,11 @@ func processFile(fileName, outputMode string, titleCase, format bool, backup ...
 		if len(backup) > 0 {
 			backupEnabled = backup[0]
 		}
-		handleInplaceMode(fileName, fset, node, format, backupEnabled)
+		handleInplaceModeWithWriters(fileName, fset, node, format, backupEnabled, writers)
 	case "print":
-		handlePrintMode(fset, node, format)
+		handlePrintModeWithWriters(fset, node, format, writers)
 	case "diff":
-		handleDiffMode(fileName, fset, node, format)
+		handleDiffModeWithWriters(fileName, fset, node, format, writers)
 	}
 
 	return numChanges
@@ -404,7 +459,7 @@ func processComments(node *ast.File, titleCase bool) (int, bool) {
 	for _, commentGroup := range node.Comments {
 		for _, comment := range commentGroup.List {
 			// check if comment is inside a function
-			if isCommentInsideFunction(nil, node, comment) {
+			if isCommentInsideFunction(node, comment) {
 				// process the comment text
 				orig := comment.Text
 				var processed string
@@ -435,25 +490,31 @@ func getModifiedContent(fset *token.FileSet, node *ast.File) (string, error) {
 
 // handleInplaceMode writes modified content back to the file
 func handleInplaceMode(fileName string, fset *token.FileSet, node *ast.File, format, backup bool) {
+	writers := DefaultWriters()
+	handleInplaceModeWithWriters(fileName, fset, node, format, backup, writers)
+}
+
+// handleInplaceModeWithWriters writes modified content back to the file with custom writers
+func handleInplaceModeWithWriters(fileName string, fset *token.FileSet, node *ast.File, format, backup bool, writers OutputWriters) {
 	// create backup if requested
 	if backup {
 		createBackupIfNeeded(fileName, fset, node)
 	}
 
 	// write the modified content to file
-	file, err := os.Create(fileName)	//nolint:gosec
+	file, err := os.Create(fileName) //nolint:gosec
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error opening %s for writing: %v\n", fileName, err)
+		fmt.Fprintf(writers.Stderr, "Error opening %s for writing: %v\n", fileName, err)
 		return
 	}
 	defer file.Close()
 
 	if err := printer.Fprint(file, fset, node); err != nil {
-		fmt.Fprintf(os.Stderr, "Error writing to file %s: %v\n", fileName, err)
+		fmt.Fprintf(writers.Stderr, "Error writing to file %s: %v\n", fileName, err)
 		return
 	}
 
-	fmt.Printf("Updated: %s\n", fileName)
+	fmt.Fprintf(writers.Stdout, "Updated: %s\n", fileName)
 
 	// run gofmt if requested
 	if format {
@@ -464,7 +525,7 @@ func handleInplaceMode(fileName string, fset *token.FileSet, node *ast.File, for
 // createBackupIfNeeded creates a backup of the file if content will change
 func createBackupIfNeeded(fileName string, fset *token.FileSet, node *ast.File) {
 	// read the original content
-	origContent, err := os.ReadFile(fileName)	//nolint:gosec
+	origContent, err := os.ReadFile(fileName) //nolint:gosec
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error reading file for backup %s: %v\n", fileName, err)
 		return
@@ -488,9 +549,15 @@ func createBackupIfNeeded(fileName string, fset *token.FileSet, node *ast.File) 
 
 // handlePrintMode prints the modified content to stdout
 func handlePrintMode(fset *token.FileSet, node *ast.File, format bool) {
+	writers := DefaultWriters()
+	handlePrintModeWithWriters(fset, node, format, writers)
+}
+
+// handlePrintModeWithWriters prints the modified content to stdout with custom writers
+func handlePrintModeWithWriters(fset *token.FileSet, node *ast.File, format bool, writers OutputWriters) {
 	var modifiedBytes strings.Builder
 	if err := printer.Fprint(&modifiedBytes, fset, node); err != nil {
-		fmt.Fprintf(os.Stderr, "Error writing to stdout: %v\n", err)
+		fmt.Fprintf(writers.Stderr, "Error writing to stdout: %v\n", err)
 		return
 	}
 
@@ -498,22 +565,28 @@ func handlePrintMode(fset *token.FileSet, node *ast.File, format bool) {
 	if format {
 		content = formatWithGofmt(content)
 	}
-	fmt.Print(content)
+	fmt.Fprint(writers.Stdout, content)
 }
 
 // handleDiffMode shows a diff between original and modified content
 func handleDiffMode(fileName string, fset *token.FileSet, node *ast.File, format bool) {
+	writers := DefaultWriters()
+	handleDiffModeWithWriters(fileName, fset, node, format, writers)
+}
+
+// handleDiffModeWithWriters shows a diff between original and modified content with custom writers
+func handleDiffModeWithWriters(fileName string, fset *token.FileSet, node *ast.File, format bool, writers OutputWriters) {
 	// read original content
-	origBytes, err := os.ReadFile(fileName)	//nolint:gosec
+	origBytes, err := os.ReadFile(fileName) //nolint:gosec
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading original file %s: %v\n", fileName, err)
+		fmt.Fprintf(writers.Stderr, "Error reading original file %s: %v\n", fileName, err)
 		return
 	}
 
 	// generate modified content
 	var modifiedBytes strings.Builder
 	if err := printer.Fprint(&modifiedBytes, fset, node); err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating diff: %v\n", err)
+		fmt.Fprintf(writers.Stderr, "Error creating diff: %v\n", err)
 		return
 	}
 
@@ -530,13 +603,13 @@ func handleDiffMode(fileName string, fset *token.FileSet, node *ast.File, format
 
 	// display diff with colors
 	cyan := color.New(color.FgCyan, color.Bold).SprintFunc()
-	fmt.Printf("%s\n", cyan("--- "+fileName+" (original)"))
-	fmt.Printf("%s\n", cyan("+++ "+fileName+" (modified)"))
-	fmt.Print(simpleDiff(originalContent, modifiedContent))
+	fmt.Fprintf(writers.Stdout, "%s\n", cyan("--- "+fileName+" (original)"))
+	fmt.Fprintf(writers.Stdout, "%s\n", cyan("+++ "+fileName+" (modified)"))
+	fmt.Fprint(writers.Stdout, simpleDiff(originalContent, modifiedContent))
 }
 
 // isCommentInsideFunction checks if a comment is inside a function declaration or a struct declaration
-func isCommentInsideFunction(_ *token.FileSet, file *ast.File, comment *ast.Comment) bool {
+func isCommentInsideFunction(file *ast.File, comment *ast.Comment) bool {
 	commentPos := comment.Pos()
 
 	// find if comment is inside a function or struct
@@ -551,13 +624,13 @@ func isCommentInsideFunction(_ *token.FileSet, file *ast.File, comment *ast.Comm
 			// check if comment is inside function body
 			if node.Body != nil && node.Body.Lbrace <= commentPos && commentPos <= node.Body.Rbrace {
 				insideNode = true
-				return false	// stop traversal
+				return false // stop traversal
 			}
 		case *ast.StructType:
 			// check if comment is inside struct definition (between braces)
 			if node.Fields != nil && node.Fields.Opening <= commentPos && commentPos <= node.Fields.Closing {
 				insideNode = true
-				return false	// stop traversal
+				return false // stop traversal
 			}
 		}
 		return true

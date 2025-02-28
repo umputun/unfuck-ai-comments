@@ -4,3 +4,5 @@ unfuck-ai-comments
 coverage.*
 coverage*.out
 test_file.go
+profile.cov_tmp
+profile.cov
