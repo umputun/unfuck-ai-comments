@@ -124,6 +124,7 @@ unfuck-ai-comments diff ./...
 - `--fmt`:     Format the output using "go fmt"
 - `--skip`:    Skip specified files or directories (can be used multiple times)
 - `--backup`:  Create .bak backup files for any files that are modified
+- `-v` or `--version`: Display version information
 
 - `--help` or `-h`: Show usage information
 
