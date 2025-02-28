@@ -513,7 +513,7 @@ func TestProcessPatternHandling(t *testing.T) {
 		os.Stdout = w
 		
 		// process specific file
-		processPattern("root.go", "inplace", false, false)
+		processPattern("root.go", ProcessRequest{OutputMode: "inplace", TitleCase: false, Format: false, SkipPatterns: []string{}})
 		
 		// restore stdout
 		err = w.Close()
@@ -543,7 +543,7 @@ func TestProcessPatternHandling(t *testing.T) {
 		os.Stdout = w
 		
 		// process glob pattern
-		processPattern("dir1/*.go", "inplace", false, false)
+		processPattern("dir1/*.go", ProcessRequest{OutputMode: "inplace", TitleCase: false, Format: false, SkipPatterns: []string{}})
 		
 		// restore stdout
 		err = w.Close()
@@ -573,7 +573,7 @@ func TestProcessPatternHandling(t *testing.T) {
 		os.Stdout = w
 		
 		// process directory
-		processPattern("dir2", "inplace", false, false)
+		processPattern("dir2", ProcessRequest{OutputMode: "inplace", TitleCase: false, Format: false, SkipPatterns: []string{}})
 		
 		// restore stdout
 		err = w.Close()
@@ -609,7 +609,7 @@ func TestProcessPatternHandling(t *testing.T) {
 		os.Stdout = w
 		
 		// process recursive pattern
-		processPattern("dir1...", "inplace", false, false)
+		processPattern("dir1...", ProcessRequest{OutputMode: "inplace", TitleCase: false, Format: false, SkipPatterns: []string{}})
 		
 		// restore stdout
 		err = w.Close()
@@ -631,7 +631,7 @@ func TestProcessPatternHandling(t *testing.T) {
 		os.Stdout = w
 		
 		// process non-existent pattern
-		processPattern("nonexistent*.go", "inplace", false, false)
+		processPattern("nonexistent*.go", ProcessRequest{OutputMode: "inplace", TitleCase: false, Format: false, SkipPatterns: []string{}})
 		
 		// restore stdout
 		err = w.Close()
@@ -697,7 +697,7 @@ func Test(  ) {
 		os.Stdout = w
 
 		// process recursively with format
-		processPattern("./...", "inplace", false, true)
+		processPattern("./...", ProcessRequest{OutputMode: "inplace", TitleCase: false, Format: true, SkipPatterns: []string{}})
 
 		// restore stdout
 		err = w.Close()
@@ -972,7 +972,7 @@ func Test() {
 
 		// process each pattern
 		for _, pattern := range patterns {
-			processPattern(pattern, outputMode, false, false)
+			processPattern(pattern, ProcessRequest{OutputMode: outputMode, TitleCase: false, Format: false, SkipPatterns: []string{}})
 		}
 
 		// restore stdout
@@ -1122,4 +1122,171 @@ func TestColorBehavior(t *testing.T) {
 	// test with colors enabled
 	color.NoColor = false
 	assert.False(t, color.NoColor, "NoColor should be false when colors are enabled")
+}
+
+// TestShouldSkip tests the shouldSkip function
+func TestShouldSkip(t *testing.T) {
+	tests := []struct {
+		name         string
+		path         string
+		skipPatterns []string
+		expected     bool
+	}{
+		{
+			name:         "no skip patterns",
+			path:         "/some/path/file.go",
+			skipPatterns: []string{},
+			expected:     false,
+		},
+		{
+			name:         "exact match",
+			path:         "/some/path/file.go",
+			skipPatterns: []string{"/some/path/file.go"},
+			expected:     true,
+		},
+		{
+			name:         "directory match",
+			path:         "/some/path/file.go",
+			skipPatterns: []string{"/some/path"},
+			expected:     true,
+		},
+		{
+			name:         "glob pattern match",
+			path:         "/some/path/file.go",
+			skipPatterns: []string{"*.go"},
+			expected:     true,
+		},
+		{
+			name:         "no match",
+			path:         "/some/path/file.go",
+			skipPatterns: []string{"/other/path", "*.txt"},
+			expected:     false,
+		},
+		{
+			name:         "multiple patterns with match",
+			path:         "/some/path/file.go",
+			skipPatterns: []string{"/other/path", "*.go"},
+			expected:     true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := shouldSkip(test.path, test.skipPatterns)
+			assert.Equal(t, test.expected, result)
+		})
+	}
+}
+
+// TestProcessPatternWithSkip tests the skip functionality in file processing
+func TestProcessPatternWithSkip(t *testing.T) {
+	// create a temporary directory structure for tests
+	tempDir := t.TempDir()
+	
+	// create subdirectories
+	subDir1 := filepath.Join(tempDir, "dir1")
+	subDir2 := filepath.Join(tempDir, "dir2")
+	err := os.Mkdir(subDir1, 0o750)
+	require.NoError(t, err, "Failed to create subdirectory 1")
+	err = os.Mkdir(subDir2, 0o750)
+	require.NoError(t, err, "Failed to create subdirectory 2")
+	
+	// create test go files with comments
+	files := map[string]string{
+		filepath.Join(tempDir, "root.go"):           "package main\n\nfunc Root() {\n\t// THIS COMMENT\n}\n",
+		filepath.Join(subDir1, "file1.go"):          "package dir1\n\nfunc Dir1() {\n\t// ANOTHER COMMENT\n}\n",
+		filepath.Join(subDir2, "file2.go"):          "package dir2\n\nfunc Dir2() {\n\t// THIRD COMMENT\n}\n",
+		filepath.Join(tempDir, "skip_this.go"):      "package main\n\nfunc Skip() {\n\t// SKIPPED COMMENT\n}\n",
+	}
+	
+	for path, content := range files {
+		err := os.WriteFile(path, []byte(content), 0o600)
+		require.NoError(t, err, "Failed to create test file: "+path)
+	}
+	
+	// save current directory
+	currentDir, err := os.Getwd()
+	require.NoError(t, err)
+	
+	// change to temp dir
+	err = os.Chdir(tempDir)
+	require.NoError(t, err)
+	defer func() {
+		err := os.Chdir(currentDir)
+		require.NoError(t, err, "Failed to restore original directory")
+	}()
+	
+	t.Run("skip specific file", func(t *testing.T) {
+		// reset files
+		for path, content := range files {
+			relPath, err := filepath.Rel(tempDir, path)
+			require.NoError(t, err)
+			err = os.WriteFile(relPath, []byte(content), 0o600)
+			require.NoError(t, err)
+		}
+		
+		// capture stdout
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+		
+		// process all files but skip one
+		req := ProcessRequest{
+			OutputMode:   "inplace",
+			TitleCase:    false,
+			Format:       false,
+			SkipPatterns: []string{"skip_this.go"},
+		}
+		processPattern(".", req)
+		
+		// restore stdout
+		err = w.Close()
+		require.NoError(t, err)
+		os.Stdout = oldStdout
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+		output := buf.String()
+		
+		// verify output
+		assert.Contains(t, output, "Updated:", "Should show files were updated")
+		
+		// check skipped file was not modified
+		content, err := os.ReadFile("skip_this.go")
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "// SKIPPED COMMENT", "Skipped file should not be modified")
+		
+		// check other files were modified
+		content, err = os.ReadFile("root.go")
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "// this comment", "Non-skipped file should be modified")
+	})
+	
+	t.Run("skip directory", func(t *testing.T) {
+		// reset files
+		for path, content := range files {
+			relPath, err := filepath.Rel(tempDir, path)
+			require.NoError(t, err)
+			err = os.WriteFile(relPath, []byte(content), 0o600)
+			require.NoError(t, err)
+		}
+		
+		// process recursively but skip dir1
+		req := ProcessRequest{
+			OutputMode:   "inplace",
+			TitleCase:    false,
+			Format:       false,
+			SkipPatterns: []string{"dir1"},
+		}
+		processPattern("./...", req)
+		
+		// check dir1 file was not modified
+		content, err := os.ReadFile(filepath.Join("dir1", "file1.go"))
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "// ANOTHER COMMENT", "File in skipped directory should not be modified")
+		
+		// check dir2 file was modified
+		content, err = os.ReadFile(filepath.Join("dir2", "file2.go"))
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "// third comment", "File in non-skipped directory should be modified")
+	})
 }
