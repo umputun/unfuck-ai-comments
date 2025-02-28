@@ -42,6 +42,7 @@ type Options struct {
 	Title	bool		`long:"title" description:"Convert only the first character to lowercase, keep the rest unchanged"`
 	Skip	[]string	`long:"skip" description:"Skip specified directories or files (can be used multiple times)"`
 	Format	bool		`long:"fmt" description:"Run gofmt on processed files"`
+	Backup	bool		`long:"backup" description:"Create .bak backups of files that are modified"`
 
 	DryRun	bool	`long:"dry" description:"Don't modify files, just show what would be changed"`
 }
@@ -61,6 +62,7 @@ func main() {
 		TitleCase:	opts.Title,
 		Format:		opts.Format,
 		SkipPatterns:	opts.Skip,
+		Backup:		opts.Backup,
 	}
 
 	// process each pattern
@@ -137,6 +139,7 @@ type ProcessRequest struct {
 	TitleCase	bool
 	Format		bool
 	SkipPatterns	[]string
+	Backup		bool
 
 	// statistics for final summary
 	FilesAnalyzed	int
@@ -167,7 +170,7 @@ func processPattern(pattern string, req *ProcessRequest) {
 		}
 
 		req.FilesAnalyzed++
-		changes := processFile(file, req.OutputMode, req.TitleCase, req.Format)
+		changes := processFile(file, req.OutputMode, req.TitleCase, req.Format, req.Backup)
 
 		if changes > 0 {
 			req.FilesUpdated++
@@ -243,7 +246,7 @@ func walkDir(dir string, req *ProcessRequest) {
 			}
 
 			req.FilesAnalyzed++
-			changes := processFile(path, req.OutputMode, req.TitleCase, req.Format)
+			changes := processFile(path, req.OutputMode, req.TitleCase, req.Format, req.Backup)
 
 			if changes > 0 {
 				req.FilesUpdated++
@@ -319,7 +322,7 @@ func formatWithGofmt(content string) string {
 	return string(formattedBytes)
 }
 
-func processFile(fileName, outputMode string, titleCase, format bool) int {
+func processFile(fileName, outputMode string, titleCase, format bool, backup ...bool) int {
 	// parse the file
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, fileName, nil, parser.ParseComments)
@@ -339,7 +342,11 @@ func processFile(fileName, outputMode string, titleCase, format bool) int {
 	// handle output based on specified mode
 	switch outputMode {
 	case "inplace":
-		handleInplaceMode(fileName, fset, node, format)
+		backupEnabled := false
+		if len(backup) > 0 {
+			backupEnabled = backup[0]
+		}
+		handleInplaceMode(fileName, fset, node, format, backupEnabled)
 	case "print":
 		handlePrintMode(fset, node, format)
 	case "diff":
@@ -378,8 +385,23 @@ func processComments(node *ast.File, titleCase bool) (int, bool) {
 	return changeCount, modified
 }
 
+// getModifiedContent generates the modified content as a string
+func getModifiedContent(fset *token.FileSet, node *ast.File) (string, error) {
+	var modifiedBuf strings.Builder
+	if err := printer.Fprint(&modifiedBuf, fset, node); err != nil {
+		return "", err
+	}
+	return modifiedBuf.String(), nil
+}
+
 // handleInplaceMode writes modified content back to the file
-func handleInplaceMode(fileName string, fset *token.FileSet, node *ast.File, format bool) {
+func handleInplaceMode(fileName string, fset *token.FileSet, node *ast.File, format, backup bool) {
+	// create backup if requested
+	if backup {
+		createBackupIfNeeded(fileName, fset, node)
+	}
+
+	// write the modified content to file
 	file, err := os.Create(fileName)	//nolint:gosec
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error opening %s for writing: %v\n", fileName, err)
@@ -397,6 +419,31 @@ func handleInplaceMode(fileName string, fset *token.FileSet, node *ast.File, for
 	// run gofmt if requested
 	if format {
 		runGoFmt(fileName)
+	}
+}
+
+// createBackupIfNeeded creates a backup of the file if content will change
+func createBackupIfNeeded(fileName string, fset *token.FileSet, node *ast.File) {
+	// read the original content
+	origContent, err := os.ReadFile(fileName) //nolint:gosec
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading file for backup %s: %v\n", fileName, err)
+		return
+	}
+	
+	// get the modified content
+	modifiedContent, err := getModifiedContent(fset, node)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error generating modified content for %s: %v\n", fileName, err)
+		return
+	}
+	
+	// only create a backup if the file is actually going to change
+	if string(origContent) != modifiedContent {
+		backupFile := fileName + ".bak"
+		if err := os.WriteFile(backupFile, origContent, 0o600); err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating backup file %s: %v\n", backupFile, err)
+		}
 	}
 }
 
