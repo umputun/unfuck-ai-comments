@@ -464,6 +464,188 @@ func Example(  ) {
 	})
 }
 
+// TestProcessPatternHandling tests different pattern types
+func TestProcessPatternHandling(t *testing.T) {
+	// create a temporary directory structure for tests
+	tempDir := t.TempDir()
+	
+	// create subdirectories
+	subDir1 := filepath.Join(tempDir, "dir1")
+	subDir2 := filepath.Join(tempDir, "dir2")
+	err := os.Mkdir(subDir1, 0o750)
+	require.NoError(t, err, "Failed to create subdirectory 1")
+	err = os.Mkdir(subDir2, 0o750)
+	require.NoError(t, err, "Failed to create subdirectory 2")
+	
+	// create test go files with comments
+	files := map[string]string{
+		filepath.Join(tempDir, "root.go"):           "package main\n\nfunc Root() {\n\t// THIS COMMENT\n}\n",
+		filepath.Join(subDir1, "file1.go"):          "package dir1\n\nfunc Dir1() {\n\t// ANOTHER COMMENT\n}\n",
+		filepath.Join(subDir2, "file2.go"):          "package dir2\n\nfunc Dir2() {\n\t// THIRD COMMENT\n}\n",
+		filepath.Join(tempDir, "notago.txt"):        "This is not a go file",
+	}
+	
+	for path, content := range files {
+		err := os.WriteFile(path, []byte(content), 0o600)
+		require.NoError(t, err, "Failed to create test file: "+path)
+	}
+	
+	// save current directory
+	currentDir, err := os.Getwd()
+	require.NoError(t, err)
+	
+	// change to temp dir
+	err = os.Chdir(tempDir)
+	require.NoError(t, err)
+	defer func() {
+		err := os.Chdir(currentDir)
+		require.NoError(t, err, "Failed to restore original directory")
+	}()
+	
+	t.Run("specific file pattern", func(t *testing.T) {
+		// reset file
+		err := os.WriteFile("root.go", []byte(files[filepath.Join(tempDir, "root.go")]), 0o600)
+		require.NoError(t, err)
+		
+		// capture stdout
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+		
+		// process specific file
+		processPattern("root.go", "inplace", false, false)
+		
+		// restore stdout
+		err = w.Close()
+		require.NoError(t, err)
+		os.Stdout = oldStdout
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+		output := buf.String()
+		
+		// verify output
+		assert.Contains(t, output, "Updated:", "Should show file was updated")
+		
+		// check file was modified
+		content, err := os.ReadFile("root.go")
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "// this comment", "Comment should be lowercase")
+	})
+	
+	t.Run("glob pattern", func(t *testing.T) {
+		// reset files
+		err := os.WriteFile(filepath.Join("dir1", "file1.go"), []byte(files[filepath.Join(tempDir, "dir1", "file1.go")]), 0o600)
+		require.NoError(t, err)
+		
+		// capture stdout
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+		
+		// process glob pattern
+		processPattern("dir1/*.go", "inplace", false, false)
+		
+		// restore stdout
+		err = w.Close()
+		require.NoError(t, err)
+		os.Stdout = oldStdout
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+		output := buf.String()
+		
+		// verify output
+		assert.Contains(t, output, "Updated:", "Should show file was updated")
+		
+		// check file was modified
+		content, err := os.ReadFile(filepath.Join("dir1", "file1.go"))
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "// another comment", "Comment should be lowercase")
+	})
+	
+	t.Run("directory pattern", func(t *testing.T) {
+		// reset files
+		err := os.WriteFile(filepath.Join("dir2", "file2.go"), []byte(files[filepath.Join(tempDir, "dir2", "file2.go")]), 0o600)
+		require.NoError(t, err)
+		
+		// capture stdout
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+		
+		// process directory
+		processPattern("dir2", "inplace", false, false)
+		
+		// restore stdout
+		err = w.Close()
+		require.NoError(t, err)
+		os.Stdout = oldStdout
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+		output := buf.String()
+		
+		// verify output
+		assert.Contains(t, output, "Updated:", "Should show file was updated")
+		
+		// check file was modified
+		content, err := os.ReadFile(filepath.Join("dir2", "file2.go"))
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "// third comment", "Comment should be lowercase")
+	})
+	
+	t.Run("recursive pattern with '...'", func(t *testing.T) {
+		// reset all files
+		for path, content := range files {
+			relPath, err := filepath.Rel(tempDir, path)
+			require.NoError(t, err)
+			if strings.HasSuffix(relPath, ".go") {
+				err := os.WriteFile(relPath, []byte(content), 0o600)
+				require.NoError(t, err)
+			}
+		}
+		
+		// capture stdout
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+		
+		// process recursive pattern
+		processPattern("dir1...", "inplace", false, false)
+		
+		// restore stdout
+		err = w.Close()
+		require.NoError(t, err)
+		os.Stdout = oldStdout
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+		
+		// check file was modified
+		content, err := os.ReadFile(filepath.Join("dir1", "file1.go"))
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "// another comment", "Comment should be lowercase")
+	})
+	
+	t.Run("invalid pattern", func(t *testing.T) {
+		// capture stdout
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+		
+		// process non-existent pattern
+		processPattern("nonexistent*.go", "inplace", false, false)
+		
+		// restore stdout
+		err = w.Close()
+		require.NoError(t, err)
+		os.Stdout = oldStdout
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+		output := buf.String()
+		
+		// verify output
+		assert.Contains(t, output, "No Go files found", "Should report no files found")
+	})
+}
+
 // TestProcessPatternWithFormat tests format option with pattern matching
 func TestProcessPatternWithFormat(t *testing.T) {
 	// create a temporary directory for test files
