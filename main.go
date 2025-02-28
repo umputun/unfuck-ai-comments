@@ -17,34 +17,36 @@ import (
 	"github.com/jessevdk/go-flags"
 )
 
+//go:generate go run github.com/umputun/unfuck-ai-comments@latest run --title --fmt main.go main_test.go
+
 // Options holds command line options
 type Options struct {
-	Run	struct {
+	Run struct {
 		Args struct {
 			Patterns []string `positional-arg-name:"FILE/PATTERN" description:"Files or patterns to process (default: current directory)"`
 		} `positional-args:"yes"`
-	}	`command:"run" description:"Process files in-place (default)"`
+	} `command:"run" description:"Process files in-place (default)"`
 
-	Diff	struct {
+	Diff struct {
 		Args struct {
 			Patterns []string `positional-arg-name:"FILE/PATTERN" description:"Files or patterns to process (default: current directory)"`
 		} `positional-args:"yes"`
-	}	`command:"diff" description:"Show diff without modifying files"`
+	} `command:"diff" description:"Show diff without modifying files"`
 
-	Print	struct {
+	Print struct {
 		Args struct {
 			Patterns []string `positional-arg-name:"FILE/PATTERN" description:"Files or patterns to process (default: current directory)"`
 		} `positional-args:"yes"`
-	}	`command:"print" description:"Print processed content to stdout"`
+	} `command:"print" description:"Print processed content to stdout"`
 
-	Title	bool		`long:"title" description:"Convert only the first character to lowercase, keep the rest unchanged"`
-	Skip	[]string	`long:"skip" description:"Skip specified directories or files (can be used multiple times)"`
-	Format	bool		`long:"fmt" description:"Run gofmt on processed files"`
+	Title  bool     `long:"title" description:"Convert only the first character to lowercase, keep the rest unchanged"`
+	Skip   []string `long:"skip" description:"Skip specified directories or files (can be used multiple times)"`
+	Format bool     `long:"fmt" description:"Run gofmt on processed files"`
 
-	DryRun	bool	`long:"dry" description:"Don't modify files, just show what would be changed"`
+	DryRun bool `long:"dry" description:"Don't modify files, just show what would be changed"`
 }
 
-var osExit = os.Exit	// replace os.Exit with a variable for testing
+var osExit = os.Exit // replace os.Exit with a variable for testing
 
 func main() {
 	// define options
@@ -64,7 +66,7 @@ func main() {
 	}
 
 	// determine the mode based on command or flags
-	mode := "inplace"	// default
+	mode := "inplace" // default
 
 	var args []string
 	// process according to command or flags
@@ -90,10 +92,10 @@ func main() {
 
 	// create process request with all options
 	req := ProcessRequest{
-		OutputMode:	mode,
-		TitleCase:	opts.Title,
-		Format:		opts.Format,
-		SkipPatterns:	opts.Skip,
+		OutputMode:   mode,
+		TitleCase:    opts.Title,
+		Format:       opts.Format,
+		SkipPatterns: opts.Skip,
 	}
 
 	// process each pattern
@@ -113,10 +115,10 @@ func patterns(p []string) []string {
 
 // ProcessRequest contains all processing parameters
 type ProcessRequest struct {
-	OutputMode	string
-	TitleCase	bool
-	Format		bool
-	SkipPatterns	[]string
+	OutputMode   string
+	TitleCase    bool
+	Format       bool
+	SkipPatterns []string
 }
 
 // processPattern processes a single pattern
@@ -270,7 +272,7 @@ func formatWithGofmt(content string) string {
 	formattedBytes, err := cmd.Output()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error formatting with gofmt: %v\n", err)
-		return content	// return original content on error
+		return content // return original content on error
 	}
 
 	return string(formattedBytes)
@@ -316,7 +318,7 @@ func processFile(fileName, outputMode string, titleCase, format bool) {
 	switch outputMode {
 	case "inplace":
 		// write modified source back to file
-		file, err := os.Create(fileName)	//nolint:gosec
+		file, err := os.Create(fileName) //nolint:gosec
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error opening %s for writing: %v\n", fileName, err)
 			return
@@ -351,7 +353,7 @@ func processFile(fileName, outputMode string, titleCase, format bool) {
 
 	case "diff":
 		// generate diff output
-		origBytes, err := os.ReadFile(fileName)	//nolint:gosec
+		origBytes, err := os.ReadFile(fileName) //nolint:gosec
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error reading original file %s: %v\n", fileName, err)
 			return
@@ -401,13 +403,13 @@ func isCommentInsideFunction(_ *token.FileSet, file *ast.File, comment *ast.Comm
 			// check if comment is inside function body
 			if node.Body != nil && node.Body.Lbrace <= commentPos && commentPos <= node.Body.Rbrace {
 				insideNode = true
-				return false	// stop traversal
+				return false // stop traversal
 			}
 		case *ast.StructType:
 			// check if comment is inside struct definition (between braces)
 			if node.Fields != nil && node.Fields.Opening <= commentPos && commentPos <= node.Fields.Closing {
 				insideNode = true
-				return false	// stop traversal
+				return false // stop traversal
 			}
 		}
 		return true
