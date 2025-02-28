@@ -7,6 +7,7 @@
 - Run tests with coverage: `go test -cover ./...`
 - Run linting: `golangci-lint run ./...`
 - Format code: `gofmt -s -w .`
+- Process comments in title case mode: `unfuck-ai-comments run --title main.go main_test.go`
 
 ## Code Style Guidelines
 - Follow [Go Code Review Comments](https://github.com/golang/go/wiki/CodeReviewComments)
