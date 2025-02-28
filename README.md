@@ -121,6 +121,7 @@ unfuck-ai-comments diff ./...
 - `--dry`:   Don't modify files, just show what would be changed (shortcut for diff command)
 - `--title`: Convert only the first character to lowercase, keep the rest unchanged
 - `--fmt`:   Format the output using "go fmt"
+- `--skip`:  Skip specified files or directories (can be used multiple times)
 
 - `--help` or `-h`: Show usage information
 
@@ -144,6 +145,11 @@ unfuck-ai-comments run ./...
 Use title case (only lowercase first character) on all Go files:
 ```
 unfuck-ai-comments --title run ./...
+```
+
+Skip specific files or directories:
+```
+unfuck-ai-comments run ./... --skip vendor --skip "*_test.go"
 ```
 
 ## How it works
