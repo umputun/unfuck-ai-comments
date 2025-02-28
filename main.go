@@ -155,19 +155,9 @@ func showVersionInfo(w io.Writer) {
 		if version == "" {
 			version = "dev"
 		}
-
-		// check if working directory has uncommitted changes
-		var modified string
-		for _, setting := range info.Settings {
-			if setting.Key == "vcs.modified" && setting.Value == "true" {
-				modified = " (modified)"
-				break
-			}
-		}
-
-		fmt.Fprintf(w, "unfuck-ai-comments %s%s\n", version, modified)
+		fmt.Fprintf(w, "unfuck-ai-comments %s\n", version)
 	} else {
-		fmt.Fprintln(w, "unfuck-ai-comments (version information not available)")
+		fmt.Fprintln(w, "unfuck-ai-comments (version unknown)")
 	}
 }
 
