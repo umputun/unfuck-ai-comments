@@ -119,7 +119,8 @@ unfuck-ai-comments diff ./...
 ## Options
 
 - `--dry`:     Don't modify files, just show what would be changed (shortcut for diff command)
-- `--title`:   Convert only the first character to lowercase, keep the rest unchanged
+- `--title`:   Convert only the first character to lowercase, keep the rest unchanged (deprecated, default now)
+- `--full`:    Convert entire comment to lowercase, not just the first character
 - `--fmt`:     Format the output using "go fmt"
 - `--skip`:    Skip specified files or directories (can be used multiple times)
 - `--backup`:  Create .bak backup files for any files that are modified
@@ -143,9 +144,9 @@ Process all Go files recursively and modify them:
 unfuck-ai-comments run ./...
 ```
 
-Use title case (only lowercase first character) on all Go files:
+Use full lowercase mode (convert entire comment to lowercase) on all Go files:
 ```
-unfuck-ai-comments --title run ./...
+unfuck-ai-comments --full run ./...
 ```
 
 Skip specific files or directories:

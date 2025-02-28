@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/fatih/color"
+	"github.com/jessevdk/go-flags"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -114,79 +115,79 @@ func ComplexFunc() {
 // TestConvertCommentToLowercase tests the comment conversion function with various formats
 func TestConvertCommentToLowercase(t *testing.T) {
 	tests := []struct {
-		name		string
-		input		string
-		expected	string
+		name     string
+		input    string
+		expected string
 	}{
 		{
-			name:		"single line comment",
-			input:		"// This SHOULD Be Converted",
-			expected:	"// this should be converted",
+			name:     "single line comment",
+			input:    "// This SHOULD Be Converted",
+			expected: "// this should be converted",
 		},
 		{
-			name:		"multi-line comment",
-			input:		"/* This SHOULD\nBe Converted */",
-			expected:	"/* this should\nbe converted */",
+			name:     "multi-line comment",
+			input:    "/* This SHOULD\nBe Converted */",
+			expected: "/* this should\nbe converted */",
 		},
 		{
-			name:		"preserve comment markers",
-			input:		"// UPPER case comment",
-			expected:	"// upper case comment",
+			name:     "preserve comment markers",
+			input:    "// UPPER case comment",
+			expected: "// upper case comment",
 		},
 		{
-			name:		"comment with special chars",
-			input:		"// Special: @#$%^&*()",
-			expected:	"// special: @#$%^&*()",
+			name:     "comment with special chars",
+			input:    "// Special: @#$%^&*()",
+			expected: "// special: @#$%^&*()",
 		},
 		{
-			name:		"comment with code example",
-			input:		"// Example: const X = 123",
-			expected:	"// example: const x = 123",
+			name:     "comment with code example",
+			input:    "// Example: const X = 123",
+			expected: "// example: const x = 123",
 		},
 		{
-			name:		"empty comment",
-			input:		"//",
-			expected:	"//",
+			name:     "empty comment",
+			input:    "//",
+			expected: "//",
 		},
 		{
-			name:		"comment with leading space",
-			input:		"//  Leading space",
-			expected:	"//  leading space",
+			name:     "comment with leading space",
+			input:    "//  Leading space",
+			expected: "//  leading space",
 		},
 		{
-			name:		"multi-line with indentation",
-			input:		"/*\n * line 1\n * Line 2\n */",
-			expected:	"/*\n * line 1\n * line 2\n */",
+			name:     "multi-line with indentation",
+			input:    "/*\n * line 1\n * Line 2\n */",
+			expected: "/*\n * line 1\n * line 2\n */",
 		},
 		{
-			name:		"not a comment",
-			input:		"const X = 1",
-			expected:	"const X = 1",	// should return unchanged
+			name:     "not a comment",
+			input:    "const X = 1",
+			expected: "const X = 1", // should return unchanged
 		},
 		{
-			name:		"TODO comment",
-			input:		"// TODO This is a TODO Item",
-			expected:	"// TODO This is a TODO Item",	// leave unchanged due to special indicator
+			name:     "TODO comment",
+			input:    "// TODO This is a TODO Item",
+			expected: "// TODO This is a TODO Item", // leave unchanged due to special indicator
 		},
 		{
-			name:		"FIXME comment",
-			input:		"// FIXME This needs FIXING",
-			expected:	"// FIXME This needs FIXING",	// leave unchanged due to special indicator
+			name:     "FIXME comment",
+			input:    "// FIXME This needs FIXING",
+			expected: "// FIXME This needs FIXING", // leave unchanged due to special indicator
 		},
 		{
-			name:		"multi-line TODO comment",
-			input:		"/*\n * TODO Fix this issue\n * Another line\n */",
-			expected:	"/*\n * todo fix this issue\n * another line\n */",	// currently multi-line indicators are not preserved
+			name:     "multi-line TODO comment",
+			input:    "/*\n * TODO Fix this issue\n * Another line\n */",
+			expected: "/*\n * todo fix this issue\n * another line\n */", // currently multi-line indicators are not preserved
 		},
 		{
-			name:		"TODO with punctuation",
-			input:		"// TODO: Fix this ASAP",
-			expected:	"// TODO: Fix this ASAP",	// leave unchanged due to special indicator
+			name:     "TODO with punctuation",
+			input:    "// TODO: Fix this ASAP",
+			expected: "// TODO: Fix this ASAP", // leave unchanged due to special indicator
 		},
 		{
-			name:		"TODO at end of comment",
-			input:		"// This is a TODO",
-			expected:	"// this is a todo",	// todo is only preserved at start of comment
+			name:     "TODO at end of comment",
+			input:    "// This is a TODO",
+			expected: "// this is a todo", // todo is only preserved at start of comment
 		},
 	}
 
@@ -201,69 +202,69 @@ func TestConvertCommentToLowercase(t *testing.T) {
 // TestConvertCommentToTitleCase tests the title case comment conversion function
 func TestConvertCommentToTitleCase(t *testing.T) {
 	tests := []struct {
-		name		string
-		input		string
-		expected	string
+		name     string
+		input    string
+		expected string
 	}{
 		{
-			name:		"single line comment",
-			input:		"// This SHOULD Be Converted",
-			expected:	"// this SHOULD Be Converted",
+			name:     "single line comment",
+			input:    "// This SHOULD Be Converted",
+			expected: "// this SHOULD Be Converted",
 		},
 		{
-			name:		"multi-line comment",
-			input:		"/* This SHOULD\nBe Converted */",
-			expected:	"/* this SHOULD\nBe Converted */",
+			name:     "multi-line comment",
+			input:    "/* This SHOULD\nBe Converted */",
+			expected: "/* this SHOULD\nBe Converted */",
 		},
 		{
-			name:		"uppercase first letter",
-			input:		"// UPPER case comment",
-			expected:	"// uPPER case comment",
+			name:     "uppercase first letter",
+			input:    "// UPPER case comment",
+			expected: "// uPPER case comment",
 		},
 		{
-			name:		"comment with special chars",
-			input:		"// Special: @#$%^&*()",
-			expected:	"// special: @#$%^&*()",
+			name:     "comment with special chars",
+			input:    "// Special: @#$%^&*()",
+			expected: "// special: @#$%^&*()",
 		},
 		{
-			name:		"comment with code example",
-			input:		"// Example: const X = 123",
-			expected:	"// example: const X = 123",
+			name:     "comment with code example",
+			input:    "// Example: const X = 123",
+			expected: "// example: const X = 123",
 		},
 		{
-			name:		"empty comment",
-			input:		"//",
-			expected:	"//",
+			name:     "empty comment",
+			input:    "//",
+			expected: "//",
 		},
 		{
-			name:		"comment with leading space",
-			input:		"//  Leading space",
-			expected:	"//  leading space",
+			name:     "comment with leading space",
+			input:    "//  Leading space",
+			expected: "//  leading space",
 		},
 		{
-			name:		"multi-line with indentation",
-			input:		"/*\n * line 1\n * Line 2\n */",
-			expected:	"/*\n * line 1\n * Line 2\n */",	// title case now uses same lowercase behavior
+			name:     "multi-line with indentation",
+			input:    "/*\n * line 1\n * Line 2\n */",
+			expected: "/*\n * line 1\n * Line 2\n */", // title case now uses same lowercase behavior
 		},
 		{
-			name:		"TODO comment",
-			input:		"// TODO This is a TODO Item",
-			expected:	"// TODO This is a TODO Item",	// leave unchanged due to special indicator
+			name:     "TODO comment",
+			input:    "// TODO This is a TODO Item",
+			expected: "// TODO This is a TODO Item", // leave unchanged due to special indicator
 		},
 		{
-			name:		"FIXME comment",
-			input:		"// FIXME This needs FIXING",
-			expected:	"// FIXME This needs FIXING",	// leave unchanged due to special indicator
+			name:     "FIXME comment",
+			input:    "// FIXME This needs FIXING",
+			expected: "// FIXME This needs FIXING", // leave unchanged due to special indicator
 		},
 		{
-			name:		"TODO with punctuation",
-			input:		"// TODO: Fix this ASAP",
-			expected:	"// TODO: Fix this ASAP",	// leave unchanged due to special indicator
+			name:     "TODO with punctuation",
+			input:    "// TODO: Fix this ASAP",
+			expected: "// TODO: Fix this ASAP", // leave unchanged due to special indicator
 		},
 		{
-			name:		"TODO comment followed by space and word",
-			input:		"// TODO Fix this now",
-			expected:	"// TODO Fix this now",	// leave unchanged due to special indicator
+			name:     "TODO comment followed by space and word",
+			input:    "// TODO Fix this now",
+			expected: "// TODO Fix this now", // leave unchanged due to special indicator
 		},
 	}
 
@@ -527,10 +528,10 @@ func TestProcessPatternHandling(t *testing.T) {
 
 	// create test go files with comments
 	files := map[string]string{
-		filepath.Join(tempDir, "root.go"):	"package main\n\nfunc Root() {\n\t// THIS COMMENT\n}\n",
-		filepath.Join(subDir1, "file1.go"):	"package dir1\n\nfunc Dir1() {\n\t// ANOTHER COMMENT\n}\n",
-		filepath.Join(subDir2, "file2.go"):	"package dir2\n\nfunc Dir2() {\n\t// THIRD COMMENT\n}\n",
-		filepath.Join(tempDir, "notago.txt"):	"This is not a go file",
+		filepath.Join(tempDir, "root.go"):    "package main\n\nfunc Root() {\n\t// THIS COMMENT\n}\n",
+		filepath.Join(subDir1, "file1.go"):   "package dir1\n\nfunc Dir1() {\n\t// ANOTHER COMMENT\n}\n",
+		filepath.Join(subDir2, "file2.go"):   "package dir2\n\nfunc Dir2() {\n\t// THIRD COMMENT\n}\n",
+		filepath.Join(tempDir, "notago.txt"): "This is not a go file",
 	}
 
 	for path, content := range files {
@@ -1041,52 +1042,52 @@ func Test() {
 
 	// test cases
 	tests := []struct {
-		name		string
-		outputMode	string
-		dryRun		bool
-		showHelp	bool
-		noColor		bool
-		patterns	[]string
-		verify		func(string)
+		name       string
+		outputMode string
+		dryRun     bool
+		showHelp   bool
+		noColor    bool
+		patterns   []string
+		verify     func(string)
 	}{
 		{
-			name:		"help flag",
-			showHelp:	true,
+			name:     "help flag",
+			showHelp: true,
 			verify: func(output string) {
 				assert.Equal(t, "help displayed", output, "Help should be displayed")
 			},
 		},
 		{
-			name:		"dry run flag",
-			dryRun:		true,
-			patterns:	[]string{testFile},
+			name:     "dry run flag",
+			dryRun:   true,
+			patterns: []string{testFile},
 			verify: func(output string) {
 				assert.Contains(t, output, "---", "Dry run should show diff")
 				assert.Contains(t, output, "+++", "Dry run should show diff")
 			},
 		},
 		{
-			name:		"no color flag",
-			noColor:	true,
-			outputMode:	"diff",
-			patterns:	[]string{testFile},
+			name:       "no color flag",
+			noColor:    true,
+			outputMode: "diff",
+			patterns:   []string{testFile},
 			verify: func(output string) {
 				assert.True(t, color.NoColor, "NoColor should be true")
 			},
 		},
 		{
-			name:		"default directory",
-			outputMode:	"inplace",
-			patterns:	[]string{},
+			name:       "default directory",
+			outputMode: "inplace",
+			patterns:   []string{},
 			verify: func(output string) {
 				// this might be empty if no .go files in current dir, or might show files processed
 				// just ensuring it doesn't crash
 			},
 		},
 		{
-			name:		"explicit file",
-			outputMode:	"inplace",
-			patterns:	[]string{testFile},
+			name:       "explicit file",
+			outputMode: "inplace",
+			patterns:   []string{testFile},
 			verify: func(output string) {
 				assert.Contains(t, output, "Updated:", "Should report file was updated")
 			},
@@ -1112,8 +1113,8 @@ func Test() {
 func TestHelperFunctions(t *testing.T) {
 	t.Run("isRecursivePattern", func(t *testing.T) {
 		tests := []struct {
-			pattern		string
-			expected	bool
+			pattern  string
+			expected bool
 		}{
 			{"./...", true},
 			{"dir/...", true},
@@ -1131,8 +1132,8 @@ func TestHelperFunctions(t *testing.T) {
 
 	t.Run("extractDirectoryFromPattern", func(t *testing.T) {
 		tests := []struct {
-			pattern		string
-			expected	string
+			pattern  string
+			expected string
 		}{
 			{"./...", "."},
 			{"dir/...", "dir"},
@@ -1175,7 +1176,7 @@ func TestHelperFunctions(t *testing.T) {
 
 		// test with directory
 		files := findGoFilesFromPattern(tempDir)
-		assert.Len(t, files, 2)	// should find the 2 .go files in the root directory
+		assert.Len(t, files, 2) // should find the 2 .go files in the root directory
 
 		// test with glob pattern
 		files = findGoFilesFromPattern(filepath.Join(tempDir, "*.go"))
@@ -1189,8 +1190,8 @@ func TestHelperFunctions(t *testing.T) {
 
 	t.Run("hasSpecialIndicator", func(t *testing.T) {
 		tests := []struct {
-			content		string
-			expected	bool
+			content  string
+			expected bool
 		}{
 			{"TODO: fix this", true},
 			{"FIXME: urgent issue", true},
@@ -1211,46 +1212,46 @@ func TestHelperFunctions(t *testing.T) {
 
 	t.Run("processLineComment", func(t *testing.T) {
 		tests := []struct {
-			name		string
-			content		string
-			fullLowercase	bool
-			expected	string
+			name          string
+			content       string
+			fullLowercase bool
+			expected      string
 		}{
 			{
-				name:		"full lowercase conversion",
-				content:	" THIS Should BE Lowercase",
-				fullLowercase:	true,
-				expected:	"// this should be lowercase",
+				name:          "full lowercase conversion",
+				content:       " THIS Should BE Lowercase",
+				fullLowercase: true,
+				expected:      "// this should be lowercase",
 			},
 			{
-				name:		"title case conversion",
-				content:	" THIS Should BE Lowercase",
-				fullLowercase:	false,
-				expected:	"// tHIS Should BE Lowercase",
+				name:          "title case conversion",
+				content:       " THIS Should BE Lowercase",
+				fullLowercase: false,
+				expected:      "// tHIS Should BE Lowercase",
 			},
 			{
-				name:		"special indicator preserved in full lowercase",
-				content:	" TODO: Fix this issue",
-				fullLowercase:	true,
-				expected:	"// TODO: Fix this issue",
+				name:          "special indicator preserved in full lowercase",
+				content:       " TODO: Fix this issue",
+				fullLowercase: true,
+				expected:      "// TODO: Fix this issue",
 			},
 			{
-				name:		"special indicator preserved in title case",
-				content:	" TODO: Fix this issue",
-				fullLowercase:	false,
-				expected:	"// TODO: Fix this issue",
+				name:          "special indicator preserved in title case",
+				content:       " TODO: Fix this issue",
+				fullLowercase: false,
+				expected:      "// TODO: Fix this issue",
 			},
 			{
-				name:		"empty content",
-				content:	"",
-				fullLowercase:	true,
-				expected:	"//",
+				name:          "empty content",
+				content:       "",
+				fullLowercase: true,
+				expected:      "//",
 			},
 			{
-				name:		"only whitespace",
-				content:	"   ",
-				fullLowercase:	true,
-				expected:	"//   ",
+				name:          "only whitespace",
+				content:       "   ",
+				fullLowercase: true,
+				expected:      "//   ",
 			},
 		}
 
@@ -1264,34 +1265,34 @@ func TestHelperFunctions(t *testing.T) {
 
 	t.Run("processMultiLineComment", func(t *testing.T) {
 		tests := []struct {
-			name		string
-			content		string
-			fullLowercase	bool
-			expected	string
+			name          string
+			content       string
+			fullLowercase bool
+			expected      string
 		}{
 			{
-				name:		"full lowercase conversion",
-				content:	"THIS Should\nBE Lowercase",
-				fullLowercase:	true,
-				expected:	"/*this should\nbe lowercase*/",
+				name:          "full lowercase conversion",
+				content:       "THIS Should\nBE Lowercase",
+				fullLowercase: true,
+				expected:      "/*this should\nbe lowercase*/",
 			},
 			{
-				name:		"title case conversion",
-				content:	"THIS Should\nBE Lowercase",
-				fullLowercase:	false,
-				expected:	"/*tHIS Should\nBE Lowercase*/",
+				name:          "title case conversion",
+				content:       "THIS Should\nBE Lowercase",
+				fullLowercase: false,
+				expected:      "/*tHIS Should\nBE Lowercase*/",
 			},
 			{
-				name:		"special indicator preserved",
-				content:	"TODO: Fix this\nAnother line",
-				fullLowercase:	true,
-				expected:	"/*TODO: Fix this\nAnother line*/",
+				name:          "special indicator preserved",
+				content:       "TODO: Fix this\nAnother line",
+				fullLowercase: true,
+				expected:      "/*TODO: Fix this\nAnother line*/",
 			},
 			{
-				name:		"empty content",
-				content:	"",
-				fullLowercase:	true,
-				expected:	"/**/",
+				name:          "empty content",
+				content:       "",
+				fullLowercase: true,
+				expected:      "/**/",
 			},
 		}
 
@@ -1314,11 +1315,11 @@ func TestBackupFlagPropagation(t *testing.T) {
 
 		// create a process request using the options
 		req := ProcessRequest{
-			OutputMode:	"inplace",
-			TitleCase:	opts.Title,
-			Format:		opts.Format,
-			SkipPatterns:	opts.Skip,
-			Backup:		opts.Backup,
+			OutputMode:   "inplace",
+			TitleCase:    opts.Title,
+			Format:       opts.Format,
+			SkipPatterns: opts.Skip,
+			Backup:       opts.Backup,
 		}
 
 		// verify the backup flag was properly passed
@@ -1331,11 +1332,11 @@ func TestBackupFlagPropagation(t *testing.T) {
 
 		// create a process request using the options
 		req = ProcessRequest{
-			OutputMode:	"inplace",
-			TitleCase:	opts.Title,
-			Format:		opts.Format,
-			SkipPatterns:	opts.Skip,
-			Backup:		opts.Backup,
+			OutputMode:   "inplace",
+			TitleCase:    opts.Title,
+			Format:       opts.Format,
+			SkipPatterns: opts.Skip,
+			Backup:       opts.Backup,
 		}
 
 		// verify the backup flag was properly passed
@@ -1349,7 +1350,7 @@ func TestModeSelection(t *testing.T) {
 	t.Run("dry run sets diff mode", func(t *testing.T) {
 		// when dryrun is true, mode should be "diff" regardless of other settings
 		dryRun := true
-		mode := "inplace"	// default
+		mode := "inplace" // default
 
 		if dryRun {
 			mode = "diff"
@@ -1361,13 +1362,13 @@ func TestModeSelection(t *testing.T) {
 	t.Run("command determines mode", func(t *testing.T) {
 		// different commands should set different modes
 		commands := map[string]string{
-			"run":		"inplace",
-			"diff":		"diff",
-			"print":	"print",
+			"run":   "inplace",
+			"diff":  "diff",
+			"print": "print",
 		}
 
 		for cmd, expectedMode := range commands {
-			mode := "inplace"	// default
+			mode := "inplace" // default
 
 			// simulate command selection
 			switch cmd {
@@ -1508,40 +1509,40 @@ func TestFunc() {
 // TestSimpleDiff tests the diff function
 func TestSimpleDiff(t *testing.T) {
 	tests := []struct {
-		name		string
-		original	string
-		modified	string
-		expect		[]string
+		name     string
+		original string
+		modified string
+		expect   []string
 	}{
 		{
-			name:		"simple change",
-			original:	"Line 1\nLine 2\nLine 3",
-			modified:	"Line 1\nModified\nLine 3",
-			expect:		[]string{"Line 2", "Modified"},
+			name:     "simple change",
+			original: "Line 1\nLine 2\nLine 3",
+			modified: "Line 1\nModified\nLine 3",
+			expect:   []string{"Line 2", "Modified"},
 		},
 		{
-			name:		"comment change",
-			original:	"// THIS IS A COMMENT",
-			modified:	"// this is a comment",
-			expect:		[]string{"THIS IS A COMMENT", "this is a comment"},
+			name:     "comment change",
+			original: "// THIS IS A COMMENT",
+			modified: "// this is a comment",
+			expect:   []string{"THIS IS A COMMENT", "this is a comment"},
 		},
 		{
-			name:		"no change",
-			original:	"Line 1\nLine 2",
-			modified:	"Line 1\nLine 2",
-			expect:		[]string{},
+			name:     "no change",
+			original: "Line 1\nLine 2",
+			modified: "Line 1\nLine 2",
+			expect:   []string{},
 		},
 		{
-			name:		"add line",
-			original:	"Line 1\nLine 2",
-			modified:	"Line 1\nLine 2\nLine 3",
-			expect:		[]string{"Line 3"},
+			name:     "add line",
+			original: "Line 1\nLine 2",
+			modified: "Line 1\nLine 2\nLine 3",
+			expect:   []string{"Line 3"},
 		},
 		{
-			name:		"remove line",
-			original:	"Line 1\nLine 2\nLine 3",
-			modified:	"Line 1\nLine 3",
-			expect:		[]string{"Line 2"},
+			name:     "remove line",
+			original: "Line 1\nLine 2\nLine 3",
+			modified: "Line 1\nLine 3",
+			expect:   []string{"Line 2"},
 		},
 	}
 
@@ -1630,7 +1631,7 @@ func Test(  ) {
 		require.NoError(t, err)
 
 		// force a write error by removing write permissions from the file
-		err = os.Chmod(testFile, 0o400)	// read-only
+		err = os.Chmod(testFile, 0o400) // read-only
 		require.NoError(t, err)
 
 		// call handleinplacemode - should not panic
@@ -1659,11 +1660,11 @@ func TestColorBehavior(t *testing.T) {
 func TestProcessRequestWithBackupFlag(t *testing.T) {
 	// test the processrequest struct with backup flag
 	req := ProcessRequest{
-		OutputMode:	"inplace",
-		TitleCase:	false,
-		Format:		true,
-		SkipPatterns:	[]string{"vendor"},
-		Backup:		true,
+		OutputMode:   "inplace",
+		TitleCase:    false,
+		Format:       true,
+		SkipPatterns: []string{"vendor"},
+		Backup:       true,
 	}
 
 	// verify the backup flag is properly set
@@ -1671,11 +1672,11 @@ func TestProcessRequestWithBackupFlag(t *testing.T) {
 
 	// test with backup disabled
 	req2 := ProcessRequest{
-		OutputMode:	"inplace",
-		TitleCase:	false,
-		Format:		true,
-		SkipPatterns:	[]string{"vendor"},
-		Backup:		false,
+		OutputMode:   "inplace",
+		TitleCase:    false,
+		Format:       true,
+		SkipPatterns: []string{"vendor"},
+		Backup:       false,
 	}
 
 	// verify the backup flag is properly unset
@@ -1803,6 +1804,86 @@ func Test() {
 	})
 }
 
+// TestDiffDefaultParams tests the default behavior of diff command without any flags
+func TestDiffDefaultParams(t *testing.T) {
+	// create a temporary directory for test files
+	tempDir := t.TempDir()
+
+	// create a test file with comments that will be modified
+	testFile := filepath.Join(tempDir, "diff_default_test.go")
+	content := `package test
+
+func TestFunc() {
+	// THIS COMMENT Should BE Modified
+	x := 1 // ANOTHER COMMENT To Modify
+}`
+	err := os.WriteFile(testFile, []byte(content), 0o600)
+	require.NoError(t, err, "Failed to write test file")
+
+	// save current directory
+	currentDir, err := os.Getwd()
+	require.NoError(t, err)
+
+	// change to temp dir to simulate running the command there
+	err = os.Chdir(tempDir)
+	require.NoError(t, err)
+	defer func() {
+		err := os.Chdir(currentDir)
+		require.NoError(t, err, "Failed to restore original directory")
+	}()
+
+	// capture stdout to check diff output
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	// determine mode and args - simulating cli without any flags
+	opts := Options{}
+	p := flags.NewParser(&opts, flags.Default)
+	// simulate running the diff command
+	cmd := p.Command.Find("diff")
+	p.Command.Active = cmd
+	opts.Diff.Args.Patterns = []string{filepath.Base(testFile)}
+
+	mode, filePatterns := determineProcessingMode(opts, p)
+
+	// verify mode is "diff"
+	assert.Equal(t, "diff", mode, "Default mode for diff command should be 'diff'")
+
+	// create process request
+	req := ProcessRequest{
+		OutputMode:   mode,
+		TitleCase:    !opts.Full, // title case is default now
+		Format:       opts.Format,
+		SkipPatterns: opts.Skip,
+		Backup:       opts.Backup,
+	}
+
+	// process the test file
+	for _, pattern := range patterns(filePatterns) {
+		processPattern(pattern, &req)
+	}
+
+	// restore stdout
+	err = w.Close()
+	require.NoError(t, err)
+	os.Stdout = oldStdout
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(r)
+	output := buf.String()
+
+	// verify diff output contains title case conversion (only first letter lowercase)
+	assert.Contains(t, output, "// THIS COMMENT", "Diff should show original comment")
+	assert.Contains(t, output, "// tHIS COMMENT", "Diff should show first letter lowercase only")
+	assert.Contains(t, output, "ANOTHER COMMENT", "Diff should show original comment")
+	assert.Contains(t, output, "aNOTHER COMMENT", "Diff should show first letter lowercase only")
+
+	// verify file wasn't actually modified
+	unchangedContent, err := os.ReadFile(testFile)
+	require.NoError(t, err, "Failed to read file")
+	assert.Equal(t, content, string(unchangedContent), "File should not be modified in diff mode")
+}
+
 // TestBackupFlag tests the backup functionality
 func TestBackupFlag(t *testing.T) {
 	// create a temporary directory for test files
@@ -1866,7 +1947,7 @@ func TestFunc() {
 
 		// make sure no backup file exists initially
 		backupFile := testFile + ".bak"
-		_ = os.Remove(backupFile)	// cleanup any previous runs
+		_ = os.Remove(backupFile) // cleanup any previous runs
 
 		// the issue is that we need to test the real scenario where no changes are needed
 		// use the full processfile function instead of separate steps
@@ -1962,46 +2043,46 @@ func TestCommentProcessingHelpers(t *testing.T) {
 	// test processlinecomment directly
 	t.Run("processLineComment", func(t *testing.T) {
 		tests := []struct {
-			name		string
-			content		string
-			fullLowercase	bool
-			expected	string
+			name          string
+			content       string
+			fullLowercase bool
+			expected      string
 		}{
 			{
-				name:		"full lowercase conversion",
-				content:	" THIS Should BE Lowercase",
-				fullLowercase:	true,
-				expected:	"// this should be lowercase",
+				name:          "full lowercase conversion",
+				content:       " THIS Should BE Lowercase",
+				fullLowercase: true,
+				expected:      "// this should be lowercase",
 			},
 			{
-				name:		"title case conversion",
-				content:	" THIS Should BE Lowercase",
-				fullLowercase:	false,
-				expected:	"// tHIS Should BE Lowercase",
+				name:          "title case conversion",
+				content:       " THIS Should BE Lowercase",
+				fullLowercase: false,
+				expected:      "// tHIS Should BE Lowercase",
 			},
 			{
-				name:		"special indicator preserved in full lowercase",
-				content:	" TODO: Fix this issue",
-				fullLowercase:	true,
-				expected:	"// TODO: Fix this issue",
+				name:          "special indicator preserved in full lowercase",
+				content:       " TODO: Fix this issue",
+				fullLowercase: true,
+				expected:      "// TODO: Fix this issue",
 			},
 			{
-				name:		"special indicator preserved in title case",
-				content:	" TODO: Fix this issue",
-				fullLowercase:	false,
-				expected:	"// TODO: Fix this issue",
+				name:          "special indicator preserved in title case",
+				content:       " TODO: Fix this issue",
+				fullLowercase: false,
+				expected:      "// TODO: Fix this issue",
 			},
 			{
-				name:		"empty content",
-				content:	"",
-				fullLowercase:	true,
-				expected:	"//",
+				name:          "empty content",
+				content:       "",
+				fullLowercase: true,
+				expected:      "//",
 			},
 			{
-				name:		"only whitespace",
-				content:	"   ",
-				fullLowercase:	true,
-				expected:	"//   ",
+				name:          "only whitespace",
+				content:       "   ",
+				fullLowercase: true,
+				expected:      "//   ",
 			},
 		}
 
@@ -2016,34 +2097,34 @@ func TestCommentProcessingHelpers(t *testing.T) {
 	// test processmultilinecomment directly
 	t.Run("processMultiLineComment", func(t *testing.T) {
 		tests := []struct {
-			name		string
-			content		string
-			fullLowercase	bool
-			expected	string
+			name          string
+			content       string
+			fullLowercase bool
+			expected      string
 		}{
 			{
-				name:		"full lowercase conversion",
-				content:	"THIS Should\nBE Lowercase",
-				fullLowercase:	true,
-				expected:	"/*this should\nbe lowercase*/",
+				name:          "full lowercase conversion",
+				content:       "THIS Should\nBE Lowercase",
+				fullLowercase: true,
+				expected:      "/*this should\nbe lowercase*/",
 			},
 			{
-				name:		"title case conversion",
-				content:	"THIS Should\nBE Lowercase",
-				fullLowercase:	false,
-				expected:	"/*tHIS Should\nBE Lowercase*/",
+				name:          "title case conversion",
+				content:       "THIS Should\nBE Lowercase",
+				fullLowercase: false,
+				expected:      "/*tHIS Should\nBE Lowercase*/",
 			},
 			{
-				name:		"special indicator preserved",
-				content:	"TODO: Fix this\nAnother line",
-				fullLowercase:	true,
-				expected:	"/*TODO: Fix this\nAnother line*/",
+				name:          "special indicator preserved",
+				content:       "TODO: Fix this\nAnother line",
+				fullLowercase: true,
+				expected:      "/*TODO: Fix this\nAnother line*/",
 			},
 			{
-				name:		"empty content",
-				content:	"",
-				fullLowercase:	true,
-				expected:	"/**/",
+				name:          "empty content",
+				content:       "",
+				fullLowercase: true,
+				expected:      "/**/",
 			},
 		}
 
@@ -2058,8 +2139,8 @@ func TestCommentProcessingHelpers(t *testing.T) {
 	// test hasspecialindicator directly
 	t.Run("hasSpecialIndicator", func(t *testing.T) {
 		tests := []struct {
-			content		string
-			expected	bool
+			content  string
+			expected bool
 		}{
 			{"TODO: fix this", true},
 			{"FIXME: urgent issue", true},
@@ -2082,52 +2163,52 @@ func TestCommentProcessingHelpers(t *testing.T) {
 // TestShouldSkip tests the shouldSkip function
 func TestShouldSkip(t *testing.T) {
 	tests := []struct {
-		name		string
-		path		string
-		skipPatterns	[]string
-		expected	bool
+		name         string
+		path         string
+		skipPatterns []string
+		expected     bool
 	}{
 		{
-			name:		"no skip patterns",
-			path:		"/some/path/file.go",
-			skipPatterns:	[]string{},
-			expected:	false,
+			name:         "no skip patterns",
+			path:         "/some/path/file.go",
+			skipPatterns: []string{},
+			expected:     false,
 		},
 		{
-			name:		"exact match",
-			path:		"/some/path/file.go",
-			skipPatterns:	[]string{"/some/path/file.go"},
-			expected:	true,
+			name:         "exact match",
+			path:         "/some/path/file.go",
+			skipPatterns: []string{"/some/path/file.go"},
+			expected:     true,
 		},
 		{
-			name:		"directory match",
-			path:		"/some/path/file.go",
-			skipPatterns:	[]string{"/some/path"},
-			expected:	true,
+			name:         "directory match",
+			path:         "/some/path/file.go",
+			skipPatterns: []string{"/some/path"},
+			expected:     true,
 		},
 		{
-			name:		"glob pattern match",
-			path:		"/some/path/file.go",
-			skipPatterns:	[]string{"*.go"},
-			expected:	true,
+			name:         "glob pattern match",
+			path:         "/some/path/file.go",
+			skipPatterns: []string{"*.go"},
+			expected:     true,
 		},
 		{
-			name:		"no match",
-			path:		"/some/path/file.go",
-			skipPatterns:	[]string{"/other/path", "*.txt"},
-			expected:	false,
+			name:         "no match",
+			path:         "/some/path/file.go",
+			skipPatterns: []string{"/other/path", "*.txt"},
+			expected:     false,
 		},
 		{
-			name:		"multiple patterns with match",
-			path:		"/some/path/file.go",
-			skipPatterns:	[]string{"/other/path", "*.go"},
-			expected:	true,
+			name:         "multiple patterns with match",
+			path:         "/some/path/file.go",
+			skipPatterns: []string{"/other/path", "*.go"},
+			expected:     true,
 		},
 		{
-			name:		"invalid glob pattern",
-			path:		"/some/path/file.go",
-			skipPatterns:	[]string{"[invalid"},
-			expected:	false,	// should not match with invalid pattern
+			name:         "invalid glob pattern",
+			path:         "/some/path/file.go",
+			skipPatterns: []string{"[invalid"},
+			expected:     false, // should not match with invalid pattern
 		},
 	}
 
@@ -2154,10 +2235,10 @@ func TestProcessPatternWithSkip(t *testing.T) {
 
 	// create test go files with comments
 	files := map[string]string{
-		filepath.Join(tempDir, "root.go"):	"package main\n\nfunc Root() {\n\t// THIS COMMENT\n}\n",
-		filepath.Join(subDir1, "file1.go"):	"package dir1\n\nfunc Dir1() {\n\t// ANOTHER COMMENT\n}\n",
-		filepath.Join(subDir2, "file2.go"):	"package dir2\n\nfunc Dir2() {\n\t// THIRD COMMENT\n}\n",
-		filepath.Join(tempDir, "skip_this.go"):	"package main\n\nfunc Skip() {\n\t// SKIPPED COMMENT\n}\n",
+		filepath.Join(tempDir, "root.go"):      "package main\n\nfunc Root() {\n\t// THIS COMMENT\n}\n",
+		filepath.Join(subDir1, "file1.go"):     "package dir1\n\nfunc Dir1() {\n\t// ANOTHER COMMENT\n}\n",
+		filepath.Join(subDir2, "file2.go"):     "package dir2\n\nfunc Dir2() {\n\t// THIRD COMMENT\n}\n",
+		filepath.Join(tempDir, "skip_this.go"): "package main\n\nfunc Skip() {\n\t// SKIPPED COMMENT\n}\n",
 	}
 
 	for path, content := range files {
@@ -2193,10 +2274,10 @@ func TestProcessPatternWithSkip(t *testing.T) {
 
 		// process all files but skip one
 		req := ProcessRequest{
-			OutputMode:	"inplace",
-			TitleCase:	false,
-			Format:		false,
-			SkipPatterns:	[]string{"skip_this.go"},
+			OutputMode:   "inplace",
+			TitleCase:    false,
+			Format:       false,
+			SkipPatterns: []string{"skip_this.go"},
 		}
 		processPattern(".", &req)
 
@@ -2233,10 +2314,10 @@ func TestProcessPatternWithSkip(t *testing.T) {
 
 		// process recursively but skip dir1
 		req := ProcessRequest{
-			OutputMode:	"inplace",
-			TitleCase:	false,
-			Format:		false,
-			SkipPatterns:	[]string{"dir1"},
+			OutputMode:   "inplace",
+			TitleCase:    false,
+			Format:       false,
+			SkipPatterns: []string{"dir1"},
 		}
 		processPattern("./...", &req)
 

@@ -21,33 +21,34 @@ import (
 
 // Options holds command line options
 type Options struct {
-	Run	struct {
+	Run struct {
 		Args struct {
 			Patterns []string `positional-arg-name:"FILE/PATTERN" description:"Files or patterns to process (default: current directory)"`
 		} `positional-args:"yes"`
-	}	`command:"run" description:"Process files in-place (default)"`
+	} `command:"run" description:"Process files in-place (default)"`
 
-	Diff	struct {
+	Diff struct {
 		Args struct {
 			Patterns []string `positional-arg-name:"FILE/PATTERN" description:"Files or patterns to process (default: current directory)"`
 		} `positional-args:"yes"`
-	}	`command:"diff" description:"Show diff without modifying files"`
+	} `command:"diff" description:"Show diff without modifying files"`
 
-	Print	struct {
+	Print struct {
 		Args struct {
 			Patterns []string `positional-arg-name:"FILE/PATTERN" description:"Files or patterns to process (default: current directory)"`
 		} `positional-args:"yes"`
-	}	`command:"print" description:"Print processed content to stdout"`
+	} `command:"print" description:"Print processed content to stdout"`
 
-	Title	bool		`long:"title" description:"Convert only the first character to lowercase, keep the rest unchanged"`
-	Skip	[]string	`long:"skip" description:"Skip specified directories or files (can be used multiple times)"`
-	Format	bool		`long:"fmt" description:"Run gofmt on processed files"`
-	Backup	bool		`long:"backup" description:"Create .bak backups of files that are modified"`
+	Title  bool     `long:"title" description:"Convert only the first character to lowercase, keep the rest unchanged (deprecated, now default behavior)"`
+	Full   bool     `long:"full" description:"Convert entire comment to lowercase, not just the first character"`
+	Skip   []string `long:"skip" description:"Skip specified directories or files (can be used multiple times)"`
+	Format bool     `long:"fmt" description:"Run gofmt on processed files"`
+	Backup bool     `long:"backup" description:"Create .bak backups of files that are modified"`
 
-	DryRun	bool	`long:"dry" description:"Don't modify files, just show what would be changed"`
+	DryRun bool `long:"dry" description:"Don't modify files, just show what would be changed"`
 }
 
-var osExit = os.Exit	// replace os.Exit with a variable for testing
+var osExit = os.Exit // replace os.Exit with a variable for testing
 
 func main() {
 	// parse command line options
@@ -58,11 +59,11 @@ func main() {
 
 	// create process request with all options
 	req := ProcessRequest{
-		OutputMode:	mode,
-		TitleCase:	opts.Title,
-		Format:		opts.Format,
-		SkipPatterns:	opts.Skip,
-		Backup:		opts.Backup,
+		OutputMode:   mode,
+		TitleCase:    !opts.Full, // title case is default, full resets it
+		Format:       opts.Format,
+		SkipPatterns: opts.Skip,
+		Backup:       opts.Backup,
 	}
 
 	// process each pattern
@@ -135,16 +136,16 @@ func patterns(p []string) []string {
 
 // ProcessRequest contains all processing parameters
 type ProcessRequest struct {
-	OutputMode	string
-	TitleCase	bool
-	Format		bool
-	SkipPatterns	[]string
-	Backup		bool
+	OutputMode   string
+	TitleCase    bool
+	Format       bool
+	SkipPatterns []string
+	Backup       bool
 
 	// statistics for final summary
-	FilesAnalyzed	int
-	FilesUpdated	int
-	TotalChanges	int
+	FilesAnalyzed int
+	FilesUpdated  int
+	TotalChanges  int
 }
 
 // processPattern processes a single pattern
@@ -316,7 +317,7 @@ func formatWithGofmt(content string) string {
 	formattedBytes, err := cmd.Output()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error formatting with gofmt: %v\n", err)
-		return content	// return original content on error
+		return content // return original content on error
 	}
 
 	return string(formattedBytes)
@@ -402,7 +403,7 @@ func handleInplaceMode(fileName string, fset *token.FileSet, node *ast.File, for
 	}
 
 	// write the modified content to file
-	file, err := os.Create(fileName)	//nolint:gosec
+	file, err := os.Create(fileName) //nolint:gosec
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error opening %s for writing: %v\n", fileName, err)
 		return
@@ -430,14 +431,14 @@ func createBackupIfNeeded(fileName string, fset *token.FileSet, node *ast.File) 
 		fmt.Fprintf(os.Stderr, "Error reading file for backup %s: %v\n", fileName, err)
 		return
 	}
-	
+
 	// get the modified content
 	modifiedContent, err := getModifiedContent(fset, node)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error generating modified content for %s: %v\n", fileName, err)
 		return
 	}
-	
+
 	// only create a backup if the file is actually going to change
 	if string(origContent) != modifiedContent {
 		backupFile := fileName + ".bak"
@@ -465,7 +466,7 @@ func handlePrintMode(fset *token.FileSet, node *ast.File, format bool) {
 // handleDiffMode shows a diff between original and modified content
 func handleDiffMode(fileName string, fset *token.FileSet, node *ast.File, format bool) {
 	// read original content
-	origBytes, err := os.ReadFile(fileName)	//nolint:gosec
+	origBytes, err := os.ReadFile(fileName) //nolint:gosec
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error reading original file %s: %v\n", fileName, err)
 		return
@@ -512,13 +513,13 @@ func isCommentInsideFunction(_ *token.FileSet, file *ast.File, comment *ast.Comm
 			// check if comment is inside function body
 			if node.Body != nil && node.Body.Lbrace <= commentPos && commentPos <= node.Body.Rbrace {
 				insideNode = true
-				return false	// stop traversal
+				return false // stop traversal
 			}
 		case *ast.StructType:
 			// check if comment is inside struct definition (between braces)
 			if node.Fields != nil && node.Fields.Opening <= commentPos && commentPos <= node.Fields.Closing {
 				insideNode = true
-				return false	// stop traversal
+				return false // stop traversal
 			}
 		}
 		return true
