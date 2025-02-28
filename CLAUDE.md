@@ -7,8 +7,9 @@
 - Run tests with coverage: `go test -cover ./...`
 - Run linting: `golangci-lint run ./...`
 - Format code: `gofmt -s -w .`
+- Run code generation: `go generate ./...` (needed before commit if any file has //go:generate directives)
 - Process comments in title case mode: `unfuck-ai-comments run --title main.go main_test.go`
-- On completion, run: formating, tests amd comments processing
+- On completion, run: formatting, tests, code generation, and comments processing
 
 ## Code Style Guidelines
 - Follow [Go Code Review Comments](https://github.com/golang/go/wiki/CodeReviewComments)
