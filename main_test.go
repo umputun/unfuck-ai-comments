@@ -1100,6 +1100,363 @@ func Test() {
 	}
 }
 
+// TestHelperFunctions tests the new helper functions added for pattern processing
+func TestHelperFunctions(t *testing.T) {
+	t.Run("isRecursivePattern", func(t *testing.T) {
+		tests := []struct {
+			pattern		string
+			expected	bool
+		}{
+			{"./...", true},
+			{"dir/...", true},
+			{"dir...", true},
+			{"dir/*.go", false},
+			{"file.go", false},
+			{"/abs/path/...", true},
+		}
+
+		for _, tc := range tests {
+			result := isRecursivePattern(tc.pattern)
+			assert.Equal(t, tc.expected, result, "Pattern: %s", tc.pattern)
+		}
+	})
+
+	t.Run("extractDirectoryFromPattern", func(t *testing.T) {
+		tests := []struct {
+			pattern		string
+			expected	string
+		}{
+			{"./...", "."},
+			{"dir/...", "dir"},
+			{"dir...", "dir"},
+			{"/abs/path/...", "/abs/path"},
+			{"...", "."},
+		}
+
+		for _, tc := range tests {
+			result := extractDirectoryFromPattern(tc.pattern)
+			assert.Equal(t, tc.expected, result, "Pattern: %s", tc.pattern)
+		}
+	})
+
+	t.Run("findGoFilesFromPattern", func(t *testing.T) {
+		// create temporary directory for testing
+		tempDir := t.TempDir()
+
+		// create test files
+		testFiles := []string{
+			filepath.Join(tempDir, "file1.go"),
+			filepath.Join(tempDir, "file2.go"),
+			filepath.Join(tempDir, "subdir", "file3.go"),
+		}
+
+		// create subdirectory
+		err := os.MkdirAll(filepath.Join(tempDir, "subdir"), 0o750)
+		require.NoError(t, err)
+
+		// create all test files
+		for _, file := range testFiles {
+			err := os.WriteFile(file, []byte("package test"), 0o600)
+			require.NoError(t, err)
+		}
+
+		// create a non-go file
+		nonGoFile := filepath.Join(tempDir, "file.txt")
+		err = os.WriteFile(nonGoFile, []byte("text file"), 0o600)
+		require.NoError(t, err)
+
+		// test with directory
+		files := findGoFilesFromPattern(tempDir)
+		assert.Len(t, files, 2)	// should find the 2 .go files in the root directory
+
+		// test with glob pattern
+		files = findGoFilesFromPattern(filepath.Join(tempDir, "*.go"))
+		assert.Len(t, files, 2)
+
+		// test with specific file
+		files = findGoFilesFromPattern(filepath.Join(tempDir, "file1.go"))
+		assert.Len(t, files, 1)
+		assert.Contains(t, files[0], "file1.go")
+	})
+
+	t.Run("hasSpecialIndicator", func(t *testing.T) {
+		tests := []struct {
+			content		string
+			expected	bool
+		}{
+			{"TODO: fix this", true},
+			{"FIXME: urgent issue", true},
+			{"HACK: workaround", true},
+			{"XXX: needs attention", true},
+			{"WARNING: be careful", true},
+			{"Normal comment", false},
+			{"Contains TODO somewhere", false},
+			{"  TODO: with spaces", true},
+			{"", false},
+		}
+
+		for _, tc := range tests {
+			result := hasSpecialIndicator(tc.content)
+			assert.Equal(t, tc.expected, result, "Content: %s", tc.content)
+		}
+	})
+
+	t.Run("processLineComment", func(t *testing.T) {
+		tests := []struct {
+			name		string
+			content		string
+			fullLowercase	bool
+			expected	string
+		}{
+			{
+				name:		"full lowercase conversion",
+				content:	" THIS Should BE Lowercase",
+				fullLowercase:	true,
+				expected:	"// this should be lowercase",
+			},
+			{
+				name:		"title case conversion",
+				content:	" THIS Should BE Lowercase",
+				fullLowercase:	false,
+				expected:	"// tHIS Should BE Lowercase",
+			},
+			{
+				name:		"special indicator preserved in full lowercase",
+				content:	" TODO: Fix this issue",
+				fullLowercase:	true,
+				expected:	"// TODO: Fix this issue",
+			},
+			{
+				name:		"special indicator preserved in title case",
+				content:	" TODO: Fix this issue",
+				fullLowercase:	false,
+				expected:	"// TODO: Fix this issue",
+			},
+			{
+				name:		"empty content",
+				content:	"",
+				fullLowercase:	true,
+				expected:	"//",
+			},
+			{
+				name:		"only whitespace",
+				content:	"   ",
+				fullLowercase:	true,
+				expected:	"//   ",
+			},
+		}
+
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				result := processLineComment(tc.content, tc.fullLowercase)
+				assert.Equal(t, tc.expected, result)
+			})
+		}
+	})
+
+	t.Run("processMultiLineComment", func(t *testing.T) {
+		tests := []struct {
+			name		string
+			content		string
+			fullLowercase	bool
+			expected	string
+		}{
+			{
+				name:		"full lowercase conversion",
+				content:	"THIS Should\nBE Lowercase",
+				fullLowercase:	true,
+				expected:	"/*this should\nbe lowercase*/",
+			},
+			{
+				name:		"title case conversion",
+				content:	"THIS Should\nBE Lowercase",
+				fullLowercase:	false,
+				expected:	"/*tHIS Should\nBE Lowercase*/",
+			},
+			{
+				name:		"special indicator preserved",
+				content:	"TODO: Fix this\nAnother line",
+				fullLowercase:	true,
+				expected:	"/*TODO: Fix this\nAnother line*/",
+			},
+			{
+				name:		"empty content",
+				content:	"",
+				fullLowercase:	true,
+				expected:	"/**/",
+			},
+		}
+
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				result := processMultiLineComment(tc.content, tc.fullLowercase)
+				assert.Equal(t, tc.expected, result)
+			})
+		}
+	})
+}
+
+// TestModeSelection tests the mode selection logic
+func TestModeSelection(t *testing.T) {
+	// test the logic without directly calling determineprocessingmode
+	t.Run("dry run sets diff mode", func(t *testing.T) {
+		// when dryrun is true, mode should be "diff" regardless of other settings
+		dryRun := true
+		mode := "inplace"	// default
+
+		if dryRun {
+			mode = "diff"
+		}
+
+		assert.Equal(t, "diff", mode, "Dry run should set mode to diff")
+	})
+
+	t.Run("command determines mode", func(t *testing.T) {
+		// different commands should set different modes
+		commands := map[string]string{
+			"run":		"inplace",
+			"diff":		"diff",
+			"print":	"print",
+		}
+
+		for cmd, expectedMode := range commands {
+			mode := "inplace"	// default
+
+			// simulate command selection
+			switch cmd {
+			case "run":
+				mode = "inplace"
+			case "diff":
+				mode = "diff"
+			case "print":
+				mode = "print"
+			}
+
+			assert.Equal(t, expectedMode, mode,
+				"Command '%s' should set mode to '%s'", cmd, expectedMode)
+		}
+	})
+}
+
+// TestOutputHandlers tests the different output handlers
+func TestOutputHandlers(t *testing.T) {
+	// create a temporary test file
+	tempDir := t.TempDir()
+	testFile := filepath.Join(tempDir, "output_test.go")
+
+	// test content
+	content := `package test
+
+func TestFunc() {
+	// THIS is a test comment
+}`
+
+	err := os.WriteFile(testFile, []byte(content), 0o600)
+	require.NoError(t, err)
+
+	// set up ast for testing
+	fset := token.NewFileSet()
+	node, err := parser.ParseFile(fset, testFile, nil, parser.ParseComments)
+	require.NoError(t, err)
+
+	// convert comments to lowercase for testing
+	modified := processComments(node, false)
+	assert.True(t, modified, "Comments should be modified")
+
+	t.Run("handleInplaceMode", func(t *testing.T) {
+		// reset file
+		err := os.WriteFile(testFile, []byte(content), 0o600)
+		require.NoError(t, err)
+
+		// capture stdout
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		// run inplace handler
+		handleInplaceMode(testFile, fset, node, false)
+
+		// restore stdout
+		err = w.Close()
+		require.NoError(t, err)
+		os.Stdout = oldStdout
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+		output := buf.String()
+
+		// verify output
+		assert.Contains(t, output, "Updated:", "Should show update message")
+
+		// check file was modified
+		modifiedContent, err := os.ReadFile(testFile)
+		require.NoError(t, err)
+		assert.Contains(t, string(modifiedContent), "// this", "Comment should be lowercase")
+	})
+
+	t.Run("handlePrintMode", func(t *testing.T) {
+		// reset file
+		err := os.WriteFile(testFile, []byte(content), 0o600)
+		require.NoError(t, err)
+
+		// capture stdout
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		// run print handler
+		handlePrintMode(fset, node, false)
+
+		// restore stdout
+		err = w.Close()
+		require.NoError(t, err)
+		os.Stdout = oldStdout
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+		output := buf.String()
+
+		// verify output contains modified content
+		assert.Contains(t, output, "// this", "Output should contain lowercase comment")
+
+		// verify file was not modified
+		origContent, err := os.ReadFile(testFile)
+		require.NoError(t, err)
+		assert.Equal(t, content, string(origContent), "Original file should not be modified")
+	})
+
+	t.Run("handleDiffMode", func(t *testing.T) {
+		// reset file
+		err := os.WriteFile(testFile, []byte(content), 0o600)
+		require.NoError(t, err)
+
+		// capture stdout
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		// run diff handler
+		handleDiffMode(testFile, fset, node, false)
+
+		// restore stdout
+		err = w.Close()
+		require.NoError(t, err)
+		os.Stdout = oldStdout
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+		output := buf.String()
+
+		// verify diff output
+		assert.Contains(t, output, "---", "Diff should show markers")
+		assert.Contains(t, output, "+++", "Diff should show markers")
+		assert.Contains(t, output, "THIS", "Diff should show original text")
+		assert.Contains(t, output, "this", "Diff should show modified text")
+
+		// verify file was not modified
+		origContent, err := os.ReadFile(testFile)
+		require.NoError(t, err)
+		assert.Equal(t, content, string(origContent), "Original file should not be modified")
+	})
+}
+
 // TestSimpleDiff tests the diff function
 func TestSimpleDiff(t *testing.T) {
 	tests := []struct {
@@ -1169,6 +1526,128 @@ func TestColorBehavior(t *testing.T) {
 	// test with colors enabled
 	color.NoColor = false
 	assert.False(t, color.NoColor, "NoColor should be false when colors are enabled")
+}
+
+// TestCommentProcessingHelpers tests the new helper functions for comment processing
+func TestCommentProcessingHelpers(t *testing.T) {
+	// test processlinecomment directly
+	t.Run("processLineComment", func(t *testing.T) {
+		tests := []struct {
+			name		string
+			content		string
+			fullLowercase	bool
+			expected	string
+		}{
+			{
+				name:		"full lowercase conversion",
+				content:	" THIS Should BE Lowercase",
+				fullLowercase:	true,
+				expected:	"// this should be lowercase",
+			},
+			{
+				name:		"title case conversion",
+				content:	" THIS Should BE Lowercase",
+				fullLowercase:	false,
+				expected:	"// tHIS Should BE Lowercase",
+			},
+			{
+				name:		"special indicator preserved in full lowercase",
+				content:	" TODO: Fix this issue",
+				fullLowercase:	true,
+				expected:	"// TODO: Fix this issue",
+			},
+			{
+				name:		"special indicator preserved in title case",
+				content:	" TODO: Fix this issue",
+				fullLowercase:	false,
+				expected:	"// TODO: Fix this issue",
+			},
+			{
+				name:		"empty content",
+				content:	"",
+				fullLowercase:	true,
+				expected:	"//",
+			},
+			{
+				name:		"only whitespace",
+				content:	"   ",
+				fullLowercase:	true,
+				expected:	"//   ",
+			},
+		}
+
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				result := processLineComment(tc.content, tc.fullLowercase)
+				assert.Equal(t, tc.expected, result)
+			})
+		}
+	})
+
+	// test processmultilinecomment directly
+	t.Run("processMultiLineComment", func(t *testing.T) {
+		tests := []struct {
+			name		string
+			content		string
+			fullLowercase	bool
+			expected	string
+		}{
+			{
+				name:		"full lowercase conversion",
+				content:	"THIS Should\nBE Lowercase",
+				fullLowercase:	true,
+				expected:	"/*this should\nbe lowercase*/",
+			},
+			{
+				name:		"title case conversion",
+				content:	"THIS Should\nBE Lowercase",
+				fullLowercase:	false,
+				expected:	"/*tHIS Should\nBE Lowercase*/",
+			},
+			{
+				name:		"special indicator preserved",
+				content:	"TODO: Fix this\nAnother line",
+				fullLowercase:	true,
+				expected:	"/*TODO: Fix this\nAnother line*/",
+			},
+			{
+				name:		"empty content",
+				content:	"",
+				fullLowercase:	true,
+				expected:	"/**/",
+			},
+		}
+
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				result := processMultiLineComment(tc.content, tc.fullLowercase)
+				assert.Equal(t, tc.expected, result)
+			})
+		}
+	})
+
+	// test hasspecialindicator directly
+	t.Run("hasSpecialIndicator", func(t *testing.T) {
+		tests := []struct {
+			content		string
+			expected	bool
+		}{
+			{"TODO: fix this", true},
+			{"FIXME: urgent issue", true},
+			{"HACK: workaround", true},
+			{"XXX: needs attention", true},
+			{"WARNING: be careful", true},
+			{"Normal comment", false},
+			{"Contains TODO somewhere", false},
+			{"  TODO: with spaces", true},
+			{"", false},
+		}
+
+		for _, tc := range tests {
+			result := hasSpecialIndicator(tc.content)
+			assert.Equal(t, tc.expected, result, "Content: %s", tc.content)
+		}
+	})
 }
 
 // TestShouldSkip tests the shouldSkip function

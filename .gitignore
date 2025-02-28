@@ -2,4 +2,5 @@ coverage.*
 test_file.go
 unfuck-ai-comments
 coverage.*
+coverage*.out
 test_file.go

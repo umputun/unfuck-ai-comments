@@ -8,6 +8,7 @@
 - Run linting: `golangci-lint run ./...`
 - Format code: `gofmt -s -w .`
 - Process comments in title case mode: `unfuck-ai-comments run --title main.go main_test.go`
+- On completion, run: formating, tests amd comments processing
 
 ## Code Style Guidelines
 - Follow [Go Code Review Comments](https://github.com/golang/go/wiki/CodeReviewComments)
@@ -23,3 +24,4 @@
   - Don't break down functions too small as it can reduce readability
   - Maintain focus on a single responsibility per function
 - Comment style: in-function comments should be lowercase sentences
+- Code width: keep lines under 130 characters when possible
