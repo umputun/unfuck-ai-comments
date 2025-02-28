@@ -1,6 +1,6 @@
 # unfuck-ai-comments [![build](https://github.com/umputun/unfuck-ai-comments/actions/workflows/ci.yml/badge.svg)](https://github.com/umputun/unfuck-ai-comments/actions/workflows/ci.yml)&nbsp;[![Coverage Status](https://coveralls.io/repos/github/umputun/unfuck-ai-comments/badge.svg?branch=master)](https://coveralls.io/github/umputun/unfuck-ai-comments?branch=master)
 
-A simple CLI tool that converts all comments inside Go functions to lowercase while preserving comments for packages and function definitions. This makes comments in code consistent and easier to read.
+A simple CLI tool that converts all comments inside Go functions and structs to lowercase while preserving comments for packages and function definitions, as well as special indicator comments like TODO and FIXME. This makes comments in code consistent and easier to read.
 
 ## Motivation
 
@@ -154,6 +154,35 @@ unfuck-ai-comments run ./... --skip vendor --skip "*_test.go"
 
 ## How it works
 
-The tool uses Go's AST parser to identify comments that are inside functions, while leaving package comments, function documentation, and other structural comments untouched.
+The tool uses Go's AST parser to identify comments that are inside functions or structs, while leaving package comments, function documentation, and other structural comments untouched.
 
-Only comments inside function bodies are modified to be lowercase.
+Comments inside function bodies and struct definitions are modified to be lowercase (or title case if the `--title` option is used).
+
+### Special Indicator Comments
+
+Comments that begin with special indicators are preserved completely unchanged:
+
+- `TODO`
+- `FIXME`
+- `HACK`
+- `XXX`
+- `NOTE`
+- `BUG`
+- `IDEA`
+- `OPTIMIZE`
+- `REVIEW`
+- `TEMP`
+- `DEBUG`
+- `NB`
+- `WARNING`
+- `DEPRECATED`
+- `NOTICE`
+
+For example:
+```go
+func Example() {
+    // TODO This comment will remain COMPLETELY unchanged
+    // this regular comment will be converted to lowercase
+    // FIXME: This will also remain untouched
+}
+```

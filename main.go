@@ -385,97 +385,173 @@ func processFile(fileName, outputMode string, titleCase, format bool) {
 	}
 }
 
-// isCommentInsideFunction checks if a comment is inside a function declaration
+// isCommentInsideFunction checks if a comment is inside a function declaration or a struct declaration
 func isCommentInsideFunction(_ *token.FileSet, file *ast.File, comment *ast.Comment) bool {
 	commentPos := comment.Pos()
 
-	// find function containing the comment
-	var insideFunc bool
+	// find if comment is inside a function or struct
+	var insideNode bool
 	ast.Inspect(file, func(n ast.Node) bool {
 		if n == nil {
 			return true
 		}
 
-		// check if this is a function declaration
-		fn, isFunc := n.(*ast.FuncDecl)
-		if isFunc {
+		switch node := n.(type) {
+		case *ast.FuncDecl:
 			// check if comment is inside function body
-			if fn.Body != nil && fn.Body.Lbrace <= commentPos && commentPos <= fn.Body.Rbrace {
-				insideFunc = true
+			if node.Body != nil && node.Body.Lbrace <= commentPos && commentPos <= node.Body.Rbrace {
+				insideNode = true
+				return false	// stop traversal
+			}
+		case *ast.StructType:
+			// check if comment is inside struct definition (between braces)
+			if node.Fields != nil && node.Fields.Opening <= commentPos && commentPos <= node.Fields.Closing {
+				insideNode = true
 				return false	// stop traversal
 			}
 		}
 		return true
 	})
 
-	return insideFunc
+	return insideNode
 }
 
 // convertCommentToLowercase converts a comment to lowercase, preserving the comment markers
+// If comment starts with a special indicator like TODO, FIXME, etc. it remains unchanged
 func convertCommentToLowercase(comment string) string {
+	// list of special indicators that should be preserved
+	specialIndicators := []string{
+		"TODO", "FIXME", "HACK", "XXX", "NOTE", "BUG", "IDEA", "OPTIMIZE",
+		"REVIEW", "TEMP", "DEBUG", "NB", "WARNING", "DEPRECATED", "NOTICE",
+	}
+
 	if strings.HasPrefix(comment, "//") {
 		// single line comment
 		content := strings.TrimPrefix(comment, "//")
+
+		// check if this comment starts with a special indicator
+		trimmedContent := strings.TrimSpace(content)
+		for _, indicator := range specialIndicators {
+			if strings.HasPrefix(trimmedContent, indicator) {
+				// if comment starts with a special indicator, leave it unchanged
+				return comment
+			}
+		}
+
+		// otherwise convert to lowercase
 		return "//" + strings.ToLower(content)
 	}
+
 	if strings.HasPrefix(comment, "/*") && strings.HasSuffix(comment, "*/") {
 		// multi-line comment
 		content := strings.TrimSuffix(strings.TrimPrefix(comment, "/*"), "*/")
+
+		// check first line for special indicators
+		lines := strings.Split(content, "\n")
+		if len(lines) > 0 {
+			trimmedFirstLine := strings.TrimSpace(lines[0])
+			for _, indicator := range specialIndicators {
+				if strings.HasPrefix(trimmedFirstLine, indicator) {
+					// if first line starts with a special indicator, leave the comment unchanged
+					return comment
+				}
+			}
+		}
+
+		// otherwise convert to lowercase
 		return "/*" + strings.ToLower(content) + "*/"
 	}
+
 	return comment
 }
 
 // convertCommentToTitleCase converts only the first character of a comment to lowercase,
-// preserving the case of the rest of the text and the comment markers
+// If comment starts with a special indicator like TODO, FIXME, etc. it remains unchanged
 func convertCommentToTitleCase(comment string) string {
+	// list of special indicators that should be preserved
+	specialIndicators := []string{
+		"TODO", "FIXME", "HACK", "XXX", "NOTE", "BUG", "IDEA", "OPTIMIZE",
+		"REVIEW", "TEMP", "DEBUG", "NB", "WARNING", "DEPRECATED", "NOTICE",
+	}
+
 	if strings.HasPrefix(comment, "//") {
 		// single line comment
 		content := strings.TrimPrefix(comment, "//")
-		if content != "" {
-			// skip leading whitespace
-			i := 0
-			for i < len(content) && unicode.IsSpace(rune(content[i])) {
-				i++
-			}
 
-			// if there's content after whitespace
-			if i < len(content) {
-				// convert only first non-whitespace character to lowercase
-				prefix := content[:i]
-				firstChar := strings.ToLower(string(content[i]))
-				restOfContent := content[i+1:]
-				return "//" + prefix + firstChar + restOfContent
+		// check if this comment starts with a special indicator
+		trimmedContent := strings.TrimSpace(content)
+		for _, indicator := range specialIndicators {
+			if strings.HasPrefix(trimmedContent, indicator) {
+				// if comment starts with a special indicator, leave it unchanged
+				return comment
 			}
+		}
+
+		// otherwise convert only the first character to lowercase
+		leadingWhitespace := ""
+		remainingContent := content
+		for i, r := range content {
+			if !unicode.IsSpace(r) {
+				leadingWhitespace = content[:i]
+				remainingContent = content[i:]
+				break
+			}
+		}
+
+		if remainingContent != "" {
+			firstChar := strings.ToLower(string(remainingContent[0]))
+			if len(remainingContent) > 1 {
+				// keep the rest of the text as is
+				return "//" + leadingWhitespace + firstChar + remainingContent[1:]
+			}
+			return "//" + leadingWhitespace + firstChar
 		}
 		return "//" + content
 	}
+
 	if strings.HasPrefix(comment, "/*") && strings.HasSuffix(comment, "*/") {
 		// multi-line comment
 		content := strings.TrimSuffix(strings.TrimPrefix(comment, "/*"), "*/")
 
-		// split by lines to handle multi-line comments
+		// check first line for special indicators
 		lines := strings.Split(content, "\n")
 		if len(lines) > 0 {
-			// process the first line
-			line := lines[0]
-			i := 0
-			for i < len(line) && unicode.IsSpace(rune(line[i])) {
-				i++
+			trimmedFirstLine := strings.TrimSpace(lines[0])
+			for _, indicator := range specialIndicators {
+				if strings.HasPrefix(trimmedFirstLine, indicator) {
+					// if first line starts with a special indicator, leave the comment unchanged
+					return comment
+				}
 			}
 
-			if i < len(line) {
-				prefix := line[:i]
-				firstChar := strings.ToLower(string(line[i]))
-				restOfLine := line[i+1:]
-				lines[0] = prefix + firstChar + restOfLine
-			}
+			// process the first line - lowercase only the first character
+			if lines[0] != "" {
+				// find the first non-whitespace character
+				leadingWhitespace := ""
+				remainingText := lines[0]
+				for i, r := range lines[0] {
+					if !unicode.IsSpace(r) {
+						leadingWhitespace = lines[0][:i]
+						remainingText = lines[0][i:]
+						break
+					}
+				}
 
-			return "/*" + strings.Join(lines, "\n") + "*/"
+				if remainingText != "" {
+					// convert only the first non-whitespace character to lowercase
+					firstChar := strings.ToLower(string(remainingText[0]))
+					if len(remainingText) > 1 {
+						lines[0] = leadingWhitespace + firstChar + remainingText[1:]
+					} else {
+						lines[0] = leadingWhitespace + firstChar
+					}
+				}
+			}
 		}
 
-		return "/*" + content + "*/"
+		return "/*" + strings.Join(lines, "\n") + "*/"
 	}
+
 	return comment
 }
 
