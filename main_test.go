@@ -560,7 +560,8 @@ func TestProcessPatternHandling(t *testing.T) {
 		os.Stdout = w
 
 		// process specific file
-		processPattern("root.go", ProcessRequest{OutputMode: "inplace", TitleCase: false, Format: false, SkipPatterns: []string{}})
+		req := ProcessRequest{OutputMode: "inplace", TitleCase: false, Format: false, SkipPatterns: []string{}}
+		processPattern("root.go", &req)
 
 		// restore stdout
 		err = w.Close()
@@ -590,7 +591,8 @@ func TestProcessPatternHandling(t *testing.T) {
 		os.Stdout = w
 
 		// process glob pattern
-		processPattern("dir1/*.go", ProcessRequest{OutputMode: "inplace", TitleCase: false, Format: false, SkipPatterns: []string{}})
+		req := ProcessRequest{OutputMode: "inplace", TitleCase: false, Format: false, SkipPatterns: []string{}}
+		processPattern("dir1/*.go", &req)
 
 		// restore stdout
 		err = w.Close()
@@ -620,7 +622,8 @@ func TestProcessPatternHandling(t *testing.T) {
 		os.Stdout = w
 
 		// process directory
-		processPattern("dir2", ProcessRequest{OutputMode: "inplace", TitleCase: false, Format: false, SkipPatterns: []string{}})
+		req := ProcessRequest{OutputMode: "inplace", TitleCase: false, Format: false, SkipPatterns: []string{}}
+		processPattern("dir2", &req)
 
 		// restore stdout
 		err = w.Close()
@@ -656,7 +659,8 @@ func TestProcessPatternHandling(t *testing.T) {
 		os.Stdout = w
 
 		// process recursive pattern
-		processPattern("dir1...", ProcessRequest{OutputMode: "inplace", TitleCase: false, Format: false, SkipPatterns: []string{}})
+		req := ProcessRequest{OutputMode: "inplace", TitleCase: false, Format: false, SkipPatterns: []string{}}
+		processPattern("dir1...", &req)
 
 		// restore stdout
 		err = w.Close()
@@ -678,7 +682,8 @@ func TestProcessPatternHandling(t *testing.T) {
 		os.Stdout = w
 
 		// process non-existent pattern
-		processPattern("nonexistent*.go", ProcessRequest{OutputMode: "inplace", TitleCase: false, Format: false, SkipPatterns: []string{}})
+		req := ProcessRequest{OutputMode: "inplace", TitleCase: false, Format: false, SkipPatterns: []string{}}
+		processPattern("nonexistent*.go", &req)
 
 		// restore stdout
 		err = w.Close()
@@ -744,7 +749,8 @@ func Test(  ) {
 		os.Stdout = w
 
 		// process recursively with format
-		processPattern("./...", ProcessRequest{OutputMode: "inplace", TitleCase: false, Format: true, SkipPatterns: []string{}})
+		req := ProcessRequest{OutputMode: "inplace", TitleCase: false, Format: true, SkipPatterns: []string{}}
+		processPattern("./...", &req)
 
 		// restore stdout
 		err = w.Close()
@@ -1019,7 +1025,8 @@ func Test() {
 
 		// process each pattern
 		for _, pattern := range patterns {
-			processPattern(pattern, ProcessRequest{OutputMode: outputMode, TitleCase: false, Format: false, SkipPatterns: []string{}})
+			req := ProcessRequest{OutputMode: outputMode, TitleCase: false, Format: false, SkipPatterns: []string{}}
+			processPattern(pattern, &req)
 		}
 
 		// restore stdout
@@ -1360,8 +1367,9 @@ func TestFunc() {
 	require.NoError(t, err)
 
 	// convert comments to lowercase for testing
-	modified := processComments(node, false)
+	changes, modified := processComments(node, false)
 	assert.True(t, modified, "Comments should be modified")
+	assert.Greater(t, changes, 0, "Should have at least one change")
 
 	t.Run("handleInplaceMode", func(t *testing.T) {
 		// reset file
@@ -1769,7 +1777,7 @@ func TestProcessPatternWithSkip(t *testing.T) {
 			Format:		false,
 			SkipPatterns:	[]string{"skip_this.go"},
 		}
-		processPattern(".", req)
+		processPattern(".", &req)
 
 		// restore stdout
 		err = w.Close()
@@ -1809,7 +1817,7 @@ func TestProcessPatternWithSkip(t *testing.T) {
 			Format:		false,
 			SkipPatterns:	[]string{"dir1"},
 		}
-		processPattern("./...", req)
+		processPattern("./...", &req)
 
 		// check dir1 file was not modified
 		content, err := os.ReadFile(filepath.Join("dir1", "file1.go"))
