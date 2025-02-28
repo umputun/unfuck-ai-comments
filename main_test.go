@@ -83,7 +83,7 @@ func ComplexFunc() {
 }`
 
 	// write the test file
-	err := os.WriteFile(testFilePath, []byte(src), 0600)
+	err := os.WriteFile(testFilePath, []byte(src), 0o600)
 	require.NoError(t, err, "Failed to write test file")
 
 	// parse the source
@@ -311,7 +311,7 @@ func Example() {
 		}
 
 		// process file in inplace mode
-		processFileWithWriters(testFile, "inplace", false, false, writers)
+		processFile(testFile, "inplace", false, false, writers)
 
 		// verify output
 		output := stdoutBuf.String()
@@ -342,7 +342,7 @@ func Example() {
 		}
 
 		// process file in diff mode
-		processFileWithWriters(testFile, "diff", false, false, writers)
+		processFile(testFile, "diff", false, false, writers)
 
 		// verify diff output
 		output := stdoutBuf.String()
@@ -373,7 +373,7 @@ func Example() {
 		}
 
 		// process file in print mode
-		processFileWithWriters(testFile, "print", false, false, writers)
+		processFile(testFile, "print", false, false, writers)
 
 		// verify printed output
 		output := stdoutBuf.String()
@@ -413,7 +413,7 @@ func Example(  ) {
 		}
 
 		// process the file with format option
-		processFileWithWriters(testFile, "inplace", false, true, writers)
+		processFile(testFile, "inplace", false, true, writers)
 
 		// verify output
 		output := stdoutBuf.String()
@@ -445,7 +445,7 @@ func Example(  ) {
 		}
 
 		// process without format option
-		processFileWithWriters(testFile, "inplace", false, false, writers)
+		processFile(testFile, "inplace", false, false, writers)
 
 		// read the file content
 		modifiedContent, err := os.ReadFile(testFile)
@@ -472,7 +472,7 @@ func Example(  ) {
 		}
 
 		// process the file with format in print mode
-		processFileWithWriters(testFile, "print", false, true, writers)
+		processFile(testFile, "print", false, true, writers)
 
 		// verify output
 		output := stdoutBuf.String()
@@ -498,7 +498,7 @@ func Example(  ) {
 		}
 
 		// process with format in diff mode
-		processFileWithWriters(testFile, "diff", false, true, writers)
+		processFile(testFile, "diff", false, true, writers)
 
 		// verify output
 		output := stdoutBuf.String()
@@ -565,7 +565,7 @@ func TestProcessPatternHandling(t *testing.T) {
 
 		// process specific file
 		req := ProcessRequest{OutputMode: "inplace", TitleCase: false, Format: false, SkipPatterns: []string{}}
-		processPatternWithWriters("root.go", &req, writers)
+		processPattern("root.go", &req, writers)
 
 		// verify output
 		output := stdoutBuf.String()
@@ -590,7 +590,7 @@ func TestProcessPatternHandling(t *testing.T) {
 
 		// process glob pattern
 		req := ProcessRequest{OutputMode: "inplace", TitleCase: false, Format: false, SkipPatterns: []string{}}
-		processPatternWithWriters("dir1/*.go", &req, writers)
+		processPattern("dir1/*.go", &req, writers)
 
 		// verify output
 		output := stdoutBuf.String()
@@ -616,7 +616,7 @@ func TestProcessPatternHandling(t *testing.T) {
 
 		// process directory
 		req := ProcessRequest{OutputMode: "inplace", TitleCase: false, Format: false, SkipPatterns: []string{}}
-		processPatternWithWriters("dir2", &req, writers)
+		processPattern("dir2", &req, writers)
 
 		// verify output
 		output := stdoutBuf.String()
@@ -648,7 +648,7 @@ func TestProcessPatternHandling(t *testing.T) {
 
 		// process recursive pattern
 		req := ProcessRequest{OutputMode: "inplace", TitleCase: false, Format: false, SkipPatterns: []string{}}
-		processPatternWithWriters("dir1...", &req, writers)
+		processPattern("dir1...", &req, writers)
 
 		// verify file was modified
 		content, err := os.ReadFile(filepath.Join("dir1", "file1.go"))
@@ -666,7 +666,7 @@ func TestProcessPatternHandling(t *testing.T) {
 
 		// process non-existent pattern
 		req := ProcessRequest{OutputMode: "inplace", TitleCase: false, Format: false, SkipPatterns: []string{}}
-		processPatternWithWriters("nonexistent*.go", &req, writers)
+		processPattern("nonexistent*.go", &req, writers)
 
 		// verify output
 		output := stdoutBuf.String()
@@ -732,7 +732,7 @@ func Test(  ) {
 
 		// process recursively with format
 		req := ProcessRequest{OutputMode: "inplace", TitleCase: false, Format: true, SkipPatterns: []string{}}
-		processPatternWithWriters("./...", &req, writers)
+		processPattern("./...", &req, writers)
 
 		// verify output
 		output := stdoutBuf.String()
@@ -785,7 +785,7 @@ func Example(  ) {
 		}
 
 		// try to run with format
-		processFileWithWriters(testFile, "inplace", false, true, writers)
+		processFile(testFile, "inplace", false, true, writers)
 
 		// despite potential gofmt errors, the file should still be processed for comments
 		fileContent, err := os.ReadFile(testFile)
@@ -834,7 +834,7 @@ func TestFunc() {
 		}
 
 		// process file directly using the processfile function
-		processFileWithWriters("cli_test_file.go", "inplace", false, false, writers)
+		processFile("cli_test_file.go", "inplace", false, false, writers)
 
 		// verify output
 		output := stdoutBuf.String()
@@ -867,7 +867,7 @@ func TestFunc() {
 		}
 
 		// process file directly in diff mode
-		processFileWithWriters("cli_test_file.go", "diff", false, false, writers)
+		processFile("cli_test_file.go", "diff", false, false, writers)
 
 		// verify diff output contains lowercase conversion
 		output := stdoutBuf.String()
@@ -894,7 +894,7 @@ func TestFunc() {
 		}
 
 		// process file directly in print mode
-		processFileWithWriters("cli_test_file.go", "print", false, false, writers)
+		processFile("cli_test_file.go", "print", false, false, writers)
 
 		// verify printed output
 		output := stdoutBuf.String()
@@ -988,7 +988,7 @@ func Test() {
 		// process each pattern
 		for _, pattern := range patterns {
 			req := ProcessRequest{OutputMode: outputMode, TitleCase: false, Format: false, SkipPatterns: []string{}}
-			processPatternWithWriters(pattern, &req, writers)
+			processPattern(pattern, &req, writers)
 		}
 
 		return stdoutBuf.String()
@@ -1501,7 +1501,7 @@ func TestProcessPatternWithSkip(t *testing.T) {
 			Format:       false,
 			SkipPatterns: []string{"skip_this.go"},
 		}
-		processPatternWithWriters(".", &req, writers)
+		processPattern(".", &req, writers)
 
 		// verify output
 		output := stdoutBuf.String()
@@ -1541,7 +1541,7 @@ func TestProcessPatternWithSkip(t *testing.T) {
 			Format:       false,
 			SkipPatterns: []string{"dir1"},
 		}
-		processPatternWithWriters("./...", &req, writers)
+		processPattern("./...", &req, writers)
 
 		// check dir1 file was not modified
 		content, err := os.ReadFile(filepath.Join("dir1", "file1.go"))
@@ -1566,7 +1566,7 @@ func TestProcessPatternWithSkip(t *testing.T) {
 		}
 
 		// try to process a non-existent file
-		processFileWithWriters(nonexistentFile, "inplace", false, false, writers)
+		processFile(nonexistentFile, "inplace", false, false, writers)
 
 		// verify error message
 		errOutput := stderrBuf.String()
@@ -1600,7 +1600,7 @@ func TestFunc() {
 		}
 
 		// process file with backup flag
-		processFileWithWriters(testFile, "inplace", false, false, writers, true)
+		processFile(testFile, "inplace", false, false, writers, true)
 
 		// verify backup file was created
 		backupFile := testFile + ".bak"
@@ -1644,7 +1644,7 @@ func TestFunc() {
 		}
 
 		// process with backup flag
-		changes := processFileWithWriters(testFile, "inplace", false, false, writers, true)
+		changes := processFile(testFile, "inplace", false, false, writers, true)
 
 		// there should be no changes since the comments are already lowercase
 		assert.Equal(t, 0, changes, "Should have no changes")
@@ -1687,7 +1687,7 @@ func Example() {
 	}
 
 	// process file in diff mode
-	processFileWithWriters(testFile, "diff", false, false, writers)
+	processFile(testFile, "diff", false, false, writers)
 
 	// verify diff output
 	output := stdoutBuf.String()
@@ -1830,7 +1830,7 @@ func (ex *Remote) Close() error {
 		}
 
 		// process file in inplace mode
-		processFileWithWriters(samplePath, "inplace", false, false, writers)
+		processFile(samplePath, "inplace", false, false, writers)
 
 		// read the processed file
 		processedContent, err := os.ReadFile(samplePath)

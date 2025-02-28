@@ -106,7 +106,7 @@ func main() {
 
 	// process each pattern
 	for _, pattern := range patterns(args) {
-		processPatternWithWriters(pattern, &req, writers)
+		processPattern(pattern, &req, writers)
 	}
 
 	// print summary for run and diff modes (not print mode)
@@ -222,18 +222,12 @@ type ProcessRequest struct {
 	TotalChanges  int
 }
 
-// processPattern processes a single pattern using default writers
-func processPattern(pattern string, req *ProcessRequest) {
-	writers := DefaultWriters()
-	processPatternWithWriters(pattern, req, writers)
-}
-
-// processPatternWithWriters processes a single pattern
-func processPatternWithWriters(pattern string, req *ProcessRequest, writers OutputWriters) {
+// processPattern processes a single pattern
+func processPattern(pattern string, req *ProcessRequest, writers OutputWriters) {
 	// handle recursive pattern cases
 	if isRecursivePattern(pattern) {
 		dir := extractDirectoryFromPattern(pattern)
-		walkDirWithWriters(dir, req, writers)
+		walkDir(dir, req, writers)
 		return
 	}
 
@@ -251,7 +245,7 @@ func processPatternWithWriters(pattern string, req *ProcessRequest, writers Outp
 		}
 
 		req.FilesAnalyzed++
-		changes := processFileWithWriters(file, req.OutputMode, req.TitleCase, req.Format, writers, req.Backup)
+		changes := processFile(file, req.OutputMode, req.TitleCase, req.Format, writers, req.Backup)
 
 		if changes > 0 {
 			req.FilesUpdated++
@@ -303,14 +297,8 @@ func findGoFilesFromPattern(pattern string) []string {
 	return files
 }
 
-// walkDir recursively processes all .go files in directory and subdirectories using default writers
-func walkDir(dir string, req *ProcessRequest) {
-	writers := DefaultWriters()
-	walkDirWithWriters(dir, req, writers)
-}
-
-// walkDirWithWriters recursively processes all .go files in directory and subdirectories
-func walkDirWithWriters(dir string, req *ProcessRequest, writers OutputWriters) {
+// walkDir recursively processes all .go files in directory and subdirectories
+func walkDir(dir string, req *ProcessRequest, writers OutputWriters) {
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -333,7 +321,7 @@ func walkDirWithWriters(dir string, req *ProcessRequest, writers OutputWriters) 
 			}
 
 			req.FilesAnalyzed++
-			changes := processFileWithWriters(path, req.OutputMode, req.TitleCase, req.Format, writers, req.Backup)
+			changes := processFile(path, req.OutputMode, req.TitleCase, req.Format, writers, req.Backup)
 
 			if changes > 0 {
 				req.FilesUpdated++
@@ -409,14 +397,8 @@ func formatWithGofmt(content string) string {
 	return string(formattedBytes)
 }
 
-// processFile processes a file using default writers
-func processFile(fileName, outputMode string, titleCase, format bool, backup ...bool) int {
-	writers := DefaultWriters()
-	return processFileWithWriters(fileName, outputMode, titleCase, format, writers, backup...)
-}
-
-// processFileWithWriters processes a file using custom writers
-func processFileWithWriters(fileName, outputMode string, titleCase, format bool, writers OutputWriters, backup ...bool) int {
+// processFile processes a file using custom writers
+func processFile(fileName, outputMode string, titleCase, format bool, writers OutputWriters, backup ...bool) int {
 	// parse the file
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, fileName, nil, parser.ParseComments)
@@ -440,11 +422,11 @@ func processFileWithWriters(fileName, outputMode string, titleCase, format bool,
 		if len(backup) > 0 {
 			backupEnabled = backup[0]
 		}
-		handleInplaceModeWithWriters(fileName, fset, node, format, backupEnabled, writers)
+		handleInplaceMode(fileName, fset, node, format, backupEnabled, writers)
 	case "print":
-		handlePrintModeWithWriters(fset, node, format, writers)
+		handlePrintMode(fset, node, format, writers)
 	case "diff":
-		handleDiffModeWithWriters(fileName, fset, node, format, writers)
+		handleDiffMode(fileName, fset, node, format, writers)
 	}
 
 	return numChanges
@@ -488,14 +470,8 @@ func getModifiedContent(fset *token.FileSet, node *ast.File) (string, error) {
 	return modifiedBuf.String(), nil
 }
 
-// handleInplaceMode writes modified content back to the file
-func handleInplaceMode(fileName string, fset *token.FileSet, node *ast.File, format, backup bool) {
-	writers := DefaultWriters()
-	handleInplaceModeWithWriters(fileName, fset, node, format, backup, writers)
-}
-
-// handleInplaceModeWithWriters writes modified content back to the file with custom writers
-func handleInplaceModeWithWriters(fileName string, fset *token.FileSet, node *ast.File, format, backup bool, writers OutputWriters) {
+// handleInplaceMode writes modified content back to the file with custom writers
+func handleInplaceMode(fileName string, fset *token.FileSet, node *ast.File, format, backup bool, writers OutputWriters) {
 	// create backup if requested
 	if backup {
 		createBackupIfNeeded(fileName, fset, node)
@@ -547,14 +523,8 @@ func createBackupIfNeeded(fileName string, fset *token.FileSet, node *ast.File) 
 	}
 }
 
-// handlePrintMode prints the modified content to stdout
-func handlePrintMode(fset *token.FileSet, node *ast.File, format bool) {
-	writers := DefaultWriters()
-	handlePrintModeWithWriters(fset, node, format, writers)
-}
-
-// handlePrintModeWithWriters prints the modified content to stdout with custom writers
-func handlePrintModeWithWriters(fset *token.FileSet, node *ast.File, format bool, writers OutputWriters) {
+// handlePrintMode prints the modified content to stdout with custom writers
+func handlePrintMode(fset *token.FileSet, node *ast.File, format bool, writers OutputWriters) {
 	var modifiedBytes strings.Builder
 	if err := printer.Fprint(&modifiedBytes, fset, node); err != nil {
 		fmt.Fprintf(writers.Stderr, "Error writing to stdout: %v\n", err)
@@ -568,14 +538,8 @@ func handlePrintModeWithWriters(fset *token.FileSet, node *ast.File, format bool
 	fmt.Fprint(writers.Stdout, content)
 }
 
-// handleDiffMode shows a diff between original and modified content
-func handleDiffMode(fileName string, fset *token.FileSet, node *ast.File, format bool) {
-	writers := DefaultWriters()
-	handleDiffModeWithWriters(fileName, fset, node, format, writers)
-}
-
-// handleDiffModeWithWriters shows a diff between original and modified content with custom writers
-func handleDiffModeWithWriters(fileName string, fset *token.FileSet, node *ast.File, format bool, writers OutputWriters) {
+// handleDiffMode shows a diff between original and modified content with custom writers
+func handleDiffMode(fileName string, fset *token.FileSet, node *ast.File, format bool, writers OutputWriters) {
 	// read original content
 	origBytes, err := os.ReadFile(fileName) //nolint:gosec
 	if err != nil {
