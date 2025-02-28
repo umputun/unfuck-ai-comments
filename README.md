@@ -118,8 +118,10 @@ unfuck-ai-comments diff ./...
 
 ## Options
 
-- `--dry`: Don't modify files, just show what would be changed (shortcut for diff command)
+- `--dry`:   Don't modify files, just show what would be changed (shortcut for diff command)
 - `--title`: Convert only the first character to lowercase, keep the rest unchanged
+- `--fmt`:   Format the output using "go fmt"
+
 - `--help` or `-h`: Show usage information
 
 ## Examples

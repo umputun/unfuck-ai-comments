@@ -4,11 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"go/ast"
-	"go/format"
 	"go/parser"
 	"go/printer"
 	"go/token"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"unicode"
@@ -19,29 +19,30 @@ import (
 
 // Options holds command line options
 type Options struct {
-	Run	struct {
+	Run struct {
 		Args struct {
 			Patterns []string `positional-arg-name:"FILE/PATTERN" description:"Files or patterns to process (default: current directory)"`
 		} `positional-args:"yes"`
-	}	`command:"run" description:"Process files in-place (default)"`
+	} `command:"run" description:"Process files in-place (default)"`
 
-	Diff	struct {
+	Diff struct {
 		Args struct {
 			Patterns []string `positional-arg-name:"FILE/PATTERN" description:"Files or patterns to process (default: current directory)"`
 		} `positional-args:"yes"`
-	}	`command:"diff" description:"Show diff without modifying files"`
+	} `command:"diff" description:"Show diff without modifying files"`
 
-	Print	struct {
+	Print struct {
 		Args struct {
 			Patterns []string `positional-arg-name:"FILE/PATTERN" description:"Files or patterns to process (default: current directory)"`
 		} `positional-args:"yes"`
-	}	`command:"print" description:"Print processed content to stdout"`
+	} `command:"print" description:"Print processed content to stdout"`
 
-	DryRun	bool	`long:"dry" description:"Don't modify files, just show what would be changed"`
-	Title	bool	`long:"title" description:"Convert only the first character to lowercase, keep the rest unchanged"`
+	DryRun bool `long:"dry" description:"Don't modify files, just show what would be changed"`
+	Title  bool `long:"title" description:"Convert only the first character to lowercase, keep the rest unchanged"`
+	Format bool `long:"fmt" description:"Run gofmt on processed files"`
 }
 
-var osExit = os.Exit	// replace os.Exit with a variable for testing
+var osExit = os.Exit // replace os.Exit with a variable for testing
 
 func main() {
 	// define options
@@ -61,7 +62,7 @@ func main() {
 	}
 
 	// determine the mode based on command or flags
-	mode := "inplace"	// default
+	mode := "inplace" // default
 
 	var args []string
 	// process according to command or flags
@@ -87,7 +88,7 @@ func main() {
 
 	// process each pattern
 	for _, pattern := range patterns(args) {
-		processPattern(pattern, mode, opts.Title)
+		processPattern(pattern, mode, opts.Title, opts.Format)
 	}
 }
 
@@ -101,10 +102,10 @@ func patterns(p []string) []string {
 }
 
 // processPattern processes a single pattern
-func processPattern(pattern, outputMode string, titleCase bool) {
+func processPattern(pattern, outputMode string, titleCase, format bool) {
 	// handle special "./..." pattern for recursive search
 	if pattern == "./..." {
-		walkDir(".", outputMode, titleCase)
+		walkDir(".", outputMode, titleCase, format)
 		return
 	}
 
@@ -116,7 +117,7 @@ func processPattern(pattern, outputMode string, titleCase bool) {
 		if dir == "" {
 			dir = "."
 		}
-		walkDir(dir, outputMode, titleCase)
+		walkDir(dir, outputMode, titleCase, format)
 		return
 	}
 
@@ -154,12 +155,12 @@ func processPattern(pattern, outputMode string, titleCase bool) {
 		if !strings.HasSuffix(file, ".go") {
 			continue
 		}
-		processFile(file, outputMode, titleCase)
+		processFile(file, outputMode, titleCase, format)
 	}
 }
 
 // walkDir recursively processes all .go files in directory and subdirectories
-func walkDir(dir, outputMode string, titleCase bool) {
+func walkDir(dir, outputMode string, titleCase, format bool) {
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -171,7 +172,7 @@ func walkDir(dir, outputMode string, titleCase bool) {
 		}
 
 		if !info.IsDir() && strings.HasSuffix(path, ".go") {
-			processFile(path, outputMode, titleCase)
+			processFile(path, outputMode, titleCase, format)
 		}
 		return nil
 	})
@@ -180,7 +181,23 @@ func walkDir(dir, outputMode string, titleCase bool) {
 	}
 }
 
-func processFile(fileName, outputMode string, titleCase bool) {
+// runGoFmt runs gofmt on the specified file
+func runGoFmt(fileName string) {
+	cmd := exec.Command("gofmt", "-w", fileName)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error running gofmt on %s: %v\n%s", fileName, err, output)
+	}
+}
+
+// runGoFmtOnContent runs gofmt on the provided content and returns formatted content
+func runGoFmtOnContent(content string) ([]byte, error) {
+	cmd := exec.Command("gofmt")
+	cmd.Stdin = strings.NewReader(content)
+	return cmd.Output()
+}
+
+func processFile(fileName, outputMode string, titleCase, format bool) {
 	// parse the file
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, fileName, nil, parser.ParseComments)
@@ -220,7 +237,7 @@ func processFile(fileName, outputMode string, titleCase bool) {
 	switch outputMode {
 	case "inplace":
 		// write modified source back to file
-		file, err := os.Create(fileName)	//nolint:gosec
+		file, err := os.Create(fileName) //nolint:gosec
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error opening %s for writing: %v\n", fileName, err)
 			return
@@ -232,26 +249,38 @@ func processFile(fileName, outputMode string, titleCase bool) {
 		}
 		fmt.Printf("Updated: %s\n", fileName)
 
+		// run gofmt if requested
+		if format {
+			runGoFmt(fileName)
+		}
+
 	case "print":
 		// print modified source to stdout
-		if err := printer.Fprint(os.Stdout, fset, node); err != nil {
+		var modifiedBytes strings.Builder
+		if err := printer.Fprint(&modifiedBytes, fset, node); err != nil {
 			fmt.Fprintf(os.Stderr, "Error writing to stdout: %v\n", err)
 			return
 		}
 
+		// if format is requested, pipe through gofmt before printing
+		if format {
+			formattedBytes, err := runGoFmtOnContent(modifiedBytes.String())
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error formatting with gofmt: %v\n", err)
+				fmt.Print(modifiedBytes.String()) // fallback to unformatted output
+			} else {
+				fmt.Print(string(formattedBytes))
+			}
+		} else {
+			fmt.Print(modifiedBytes.String())
+		}
+
 	case "diff":
 		// generate diff output
-		origBytes, err := os.ReadFile(fileName)	//nolint:gosec
+		origBytes, err := os.ReadFile(fileName) //nolint:gosec
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error reading original file %s: %v\n", fileName, err)
 			return
-		}
-
-		// format the original content with gofmt
-		formattedOrig, err := formatGoCode(string(origBytes))
-		if err != nil {
-			// if formatting fails, fall back to original
-			formattedOrig = string(origBytes)
 		}
 
 		// generate modified content
@@ -261,11 +290,20 @@ func processFile(fileName, outputMode string, titleCase bool) {
 			return
 		}
 
-		// format the modified content with gofmt
-		formattedMod, err := formatGoCode(modifiedBytes.String())
-		if err != nil {
-			// if formatting fails, fall back to unformatted
-			formattedMod = modifiedBytes.String()
+		// get original and modified content
+		originalContent := string(origBytes)
+		modifiedContent := modifiedBytes.String()
+
+		// apply formatting if requested
+		if format {
+			// format the original content
+			if formattedBytes, err := runGoFmtOnContent(originalContent); err == nil {
+				originalContent = string(formattedBytes)
+			}
+			// format the modified content
+			if formattedBytes, err := runGoFmtOnContent(modifiedContent); err == nil {
+				modifiedContent = string(formattedBytes)
+			}
 		}
 
 		// use cyan for file information
@@ -274,7 +312,7 @@ func processFile(fileName, outputMode string, titleCase bool) {
 		fmt.Printf("%s\n", cyan("+++ "+fileName+" (modified)"))
 
 		// print the diff with colors
-		fmt.Print(simpleDiff(formattedOrig, formattedMod))
+		fmt.Print(simpleDiff(originalContent, modifiedContent))
 	}
 }
 
@@ -295,7 +333,7 @@ func isCommentInsideFunction(_ *token.FileSet, file *ast.File, comment *ast.Comm
 			// check if comment is inside function body
 			if fn.Body != nil && fn.Body.Lbrace <= commentPos && commentPos <= fn.Body.Rbrace {
 				insideFunc = true
-				return false	// stop traversal
+				return false // stop traversal
 			}
 		}
 		return true
@@ -370,15 +408,6 @@ func convertCommentToTitleCase(comment string) string {
 		return "/*" + content + "*/"
 	}
 	return comment
-}
-
-// formatGoCode formats Go code using go/format.
-func formatGoCode(src string) (string, error) {
-	formatted, err := format.Source([]byte(src))
-	if err != nil {
-		return "", err
-	}
-	return string(formatted), nil
 }
 
 // simpleDiff creates a colorized diff output
