@@ -19,32 +19,32 @@ import (
 
 // Options holds command line options
 type Options struct {
-	Run struct {
+	Run	struct {
 		Args struct {
 			Patterns []string `positional-arg-name:"FILE/PATTERN" description:"Files or patterns to process (default: current directory)"`
 		} `positional-args:"yes"`
-	} `command:"run" description:"Process files in-place (default)"`
+	}	`command:"run" description:"Process files in-place (default)"`
 
-	Diff struct {
+	Diff	struct {
 		Args struct {
 			Patterns []string `positional-arg-name:"FILE/PATTERN" description:"Files or patterns to process (default: current directory)"`
 		} `positional-args:"yes"`
-	} `command:"diff" description:"Show diff without modifying files"`
+	}	`command:"diff" description:"Show diff without modifying files"`
 
-	Print struct {
+	Print	struct {
 		Args struct {
 			Patterns []string `positional-arg-name:"FILE/PATTERN" description:"Files or patterns to process (default: current directory)"`
 		} `positional-args:"yes"`
-	} `command:"print" description:"Print processed content to stdout"`
+	}	`command:"print" description:"Print processed content to stdout"`
 
-	Title  bool     `long:"title" description:"Convert only the first character to lowercase, keep the rest unchanged"`
-	Skip   []string `long:"skip" description:"Skip specified directories or files (can be used multiple times)"`
-	Format bool     `long:"fmt" description:"Run gofmt on processed files"`
+	Title	bool		`long:"title" description:"Convert only the first character to lowercase, keep the rest unchanged"`
+	Skip	[]string	`long:"skip" description:"Skip specified directories or files (can be used multiple times)"`
+	Format	bool		`long:"fmt" description:"Run gofmt on processed files"`
 
-	DryRun bool `long:"dry" description:"Don't modify files, just show what would be changed"`
+	DryRun	bool	`long:"dry" description:"Don't modify files, just show what would be changed"`
 }
 
-var osExit = os.Exit // replace os.Exit with a variable for testing
+var osExit = os.Exit	// replace os.Exit with a variable for testing
 
 func main() {
 	// define options
@@ -64,7 +64,7 @@ func main() {
 	}
 
 	// determine the mode based on command or flags
-	mode := "inplace" // default
+	mode := "inplace"	// default
 
 	var args []string
 	// process according to command or flags
@@ -90,12 +90,12 @@ func main() {
 
 	// create process request with all options
 	req := ProcessRequest{
-		OutputMode:   mode,
-		TitleCase:    opts.Title,
-		Format:       opts.Format,
-		SkipPatterns: opts.Skip,
+		OutputMode:	mode,
+		TitleCase:	opts.Title,
+		Format:		opts.Format,
+		SkipPatterns:	opts.Skip,
 	}
-	
+
 	// process each pattern
 	for _, pattern := range patterns(args) {
 		processPattern(pattern, req)
@@ -113,10 +113,10 @@ func patterns(p []string) []string {
 
 // ProcessRequest contains all processing parameters
 type ProcessRequest struct {
-	OutputMode   string
-	TitleCase    bool
-	Format       bool
-	SkipPatterns []string
+	OutputMode	string
+	TitleCase	bool
+	Format		bool
+	SkipPatterns	[]string
 }
 
 // processPattern processes a single pattern
@@ -173,12 +173,12 @@ func processPattern(pattern string, req ProcessRequest) {
 		if !strings.HasSuffix(file, ".go") {
 			continue
 		}
-		
+
 		// check if file should be skipped
 		if shouldSkip(file, req.SkipPatterns) {
 			continue
 		}
-		
+
 		processFile(file, req.OutputMode, req.TitleCase, req.Format)
 	}
 }
@@ -194,7 +194,7 @@ func walkDir(dir string, req ProcessRequest) {
 		if info.IsDir() && (info.Name() == "vendor" || strings.Contains(path, "/vendor/")) {
 			return filepath.SkipDir
 		}
-		
+
 		// check if directory should be skipped
 		if info.IsDir() && shouldSkip(path, req.SkipPatterns) {
 			return filepath.SkipDir
@@ -219,34 +219,34 @@ func shouldSkip(path string, skipPatterns []string) bool {
 	if len(skipPatterns) == 0 {
 		return false
 	}
-	
+
 	// normalize path
 	normalizedPath := filepath.Clean(path)
-	
+
 	for _, skipPattern := range skipPatterns {
 		// check for exact match
 		if skipPattern == normalizedPath {
 			return true
 		}
-		
+
 		// check if path is within a skipped directory
 		if strings.HasPrefix(normalizedPath, skipPattern+string(filepath.Separator)) {
 			return true
 		}
-		
+
 		// check for glob pattern match
 		matched, err := filepath.Match(skipPattern, normalizedPath)
 		if err == nil && matched {
 			return true
 		}
-		
+
 		// also check just the base name for simple pattern matching
 		matched, err = filepath.Match(skipPattern, filepath.Base(normalizedPath))
 		if err == nil && matched {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -259,11 +259,20 @@ func runGoFmt(fileName string) {
 	}
 }
 
-// runGoFmtOnContent runs gofmt on the provided content and returns formatted content
-func runGoFmtOnContent(content string) ([]byte, error) {
+// formatWithGofmt formats the given content with gofmt
+// returns the original content if formatting fails
+func formatWithGofmt(content string) string {
 	cmd := exec.Command("gofmt")
 	cmd.Stdin = strings.NewReader(content)
-	return cmd.Output()
+
+	// capture the stdout output
+	formattedBytes, err := cmd.Output()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error formatting with gofmt: %v\n", err)
+		return content	// return original content on error
+	}
+
+	return string(formattedBytes)
 }
 
 func processFile(fileName, outputMode string, titleCase, format bool) {
@@ -306,7 +315,7 @@ func processFile(fileName, outputMode string, titleCase, format bool) {
 	switch outputMode {
 	case "inplace":
 		// write modified source back to file
-		file, err := os.Create(fileName) //nolint:gosec
+		file, err := os.Create(fileName)	//nolint:gosec
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error opening %s for writing: %v\n", fileName, err)
 			return
@@ -331,22 +340,17 @@ func processFile(fileName, outputMode string, titleCase, format bool) {
 			return
 		}
 
-		// if format is requested, pipe through gofmt before printing
+		// if format is requested, use our helper function
 		if format {
-			formattedBytes, err := runGoFmtOnContent(modifiedBytes.String())
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error formatting with gofmt: %v\n", err)
-				fmt.Print(modifiedBytes.String()) // fallback to unformatted output
-			} else {
-				fmt.Print(string(formattedBytes))
-			}
+			formattedContent := formatWithGofmt(modifiedBytes.String())
+			fmt.Print(formattedContent)
 		} else {
 			fmt.Print(modifiedBytes.String())
 		}
 
 	case "diff":
 		// generate diff output
-		origBytes, err := os.ReadFile(fileName) //nolint:gosec
+		origBytes, err := os.ReadFile(fileName)	//nolint:gosec
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error reading original file %s: %v\n", fileName, err)
 			return
@@ -365,14 +369,9 @@ func processFile(fileName, outputMode string, titleCase, format bool) {
 
 		// apply formatting if requested
 		if format {
-			// format the original content
-			if formattedBytes, err := runGoFmtOnContent(originalContent); err == nil {
-				originalContent = string(formattedBytes)
-			}
-			// format the modified content
-			if formattedBytes, err := runGoFmtOnContent(modifiedContent); err == nil {
-				modifiedContent = string(formattedBytes)
-			}
+			// format both original and modified content for consistency
+			originalContent = formatWithGofmt(originalContent)
+			modifiedContent = formatWithGofmt(modifiedContent)
 		}
 
 		// use cyan for file information
@@ -402,7 +401,7 @@ func isCommentInsideFunction(_ *token.FileSet, file *ast.File, comment *ast.Comm
 			// check if comment is inside function body
 			if fn.Body != nil && fn.Body.Lbrace <= commentPos && commentPos <= fn.Body.Rbrace {
 				insideFunc = true
-				return false // stop traversal
+				return false	// stop traversal
 			}
 		}
 		return true
