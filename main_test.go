@@ -1570,7 +1570,7 @@ func TestHandleInplaceModeFunction(t *testing.T) {
 		// create a directory with the same name where we'll try to create a file
 		// this will cause os.create to fail
 		dirFile := filepath.Join(tempDir, "dir_as_file")
-		err := os.Mkdir(dirFile, 0o755)
+		err := os.Mkdir(dirFile, 0o750) // use more restrictive permissions as per linter
 		require.NoError(t, err)
 
 		// setup simple ast
