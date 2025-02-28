@@ -37,9 +37,11 @@ type Options struct {
 		} `positional-args:"yes"`
 	} `command:"print" description:"Print processed content to stdout"`
 
+	Title  bool     `long:"title" description:"Convert only the first character to lowercase, keep the rest unchanged"`
+	Skip   []string `long:"skip" description:"Skip specified directories or files (can be used multiple times)"`
+	Format bool     `long:"fmt" description:"Run gofmt on processed files"`
+
 	DryRun bool `long:"dry" description:"Don't modify files, just show what would be changed"`
-	Title  bool `long:"title" description:"Convert only the first character to lowercase, keep the rest unchanged"`
-	Format bool `long:"fmt" description:"Run gofmt on processed files"`
 }
 
 var osExit = os.Exit // replace os.Exit with a variable for testing
@@ -86,9 +88,17 @@ func main() {
 		args = opts.Run.Args.Patterns
 	}
 
+	// create process request with all options
+	req := ProcessRequest{
+		OutputMode:   mode,
+		TitleCase:    opts.Title,
+		Format:       opts.Format,
+		SkipPatterns: opts.Skip,
+	}
+	
 	// process each pattern
 	for _, pattern := range patterns(args) {
-		processPattern(pattern, mode, opts.Title, opts.Format)
+		processPattern(pattern, req)
 	}
 }
 
@@ -101,11 +111,19 @@ func patterns(p []string) []string {
 	return res
 }
 
+// ProcessRequest contains all processing parameters
+type ProcessRequest struct {
+	OutputMode   string
+	TitleCase    bool
+	Format       bool
+	SkipPatterns []string
+}
+
 // processPattern processes a single pattern
-func processPattern(pattern, outputMode string, titleCase, format bool) {
+func processPattern(pattern string, req ProcessRequest) {
 	// handle special "./..." pattern for recursive search
 	if pattern == "./..." {
-		walkDir(".", outputMode, titleCase, format)
+		walkDir(".", req)
 		return
 	}
 
@@ -117,7 +135,7 @@ func processPattern(pattern, outputMode string, titleCase, format bool) {
 		if dir == "" {
 			dir = "."
 		}
-		walkDir(dir, outputMode, titleCase, format)
+		walkDir(dir, req)
 		return
 	}
 
@@ -155,12 +173,18 @@ func processPattern(pattern, outputMode string, titleCase, format bool) {
 		if !strings.HasSuffix(file, ".go") {
 			continue
 		}
-		processFile(file, outputMode, titleCase, format)
+		
+		// check if file should be skipped
+		if shouldSkip(file, req.SkipPatterns) {
+			continue
+		}
+		
+		processFile(file, req.OutputMode, req.TitleCase, req.Format)
 	}
 }
 
 // walkDir recursively processes all .go files in directory and subdirectories
-func walkDir(dir, outputMode string, titleCase, format bool) {
+func walkDir(dir string, req ProcessRequest) {
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -170,15 +194,60 @@ func walkDir(dir, outputMode string, titleCase, format bool) {
 		if info.IsDir() && (info.Name() == "vendor" || strings.Contains(path, "/vendor/")) {
 			return filepath.SkipDir
 		}
+		
+		// check if directory should be skipped
+		if info.IsDir() && shouldSkip(path, req.SkipPatterns) {
+			return filepath.SkipDir
+		}
 
 		if !info.IsDir() && strings.HasSuffix(path, ".go") {
-			processFile(path, outputMode, titleCase, format)
+			// check if file should be skipped
+			if shouldSkip(path, req.SkipPatterns) {
+				return nil
+			}
+			processFile(path, req.OutputMode, req.TitleCase, req.Format)
 		}
 		return nil
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error walking directory %s: %v\n", dir, err)
 	}
+}
+
+// shouldSkip checks if a path should be skipped based on skip patterns
+func shouldSkip(path string, skipPatterns []string) bool {
+	if len(skipPatterns) == 0 {
+		return false
+	}
+	
+	// normalize path
+	normalizedPath := filepath.Clean(path)
+	
+	for _, skipPattern := range skipPatterns {
+		// check for exact match
+		if skipPattern == normalizedPath {
+			return true
+		}
+		
+		// check if path is within a skipped directory
+		if strings.HasPrefix(normalizedPath, skipPattern+string(filepath.Separator)) {
+			return true
+		}
+		
+		// check for glob pattern match
+		matched, err := filepath.Match(skipPattern, normalizedPath)
+		if err == nil && matched {
+			return true
+		}
+		
+		// also check just the base name for simple pattern matching
+		matched, err = filepath.Match(skipPattern, filepath.Base(normalizedPath))
+		if err == nil && matched {
+			return true
+		}
+	}
+	
+	return false
 }
 
 // runGoFmt runs gofmt on the specified file
