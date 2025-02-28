@@ -18,5 +18,8 @@
 - Validate function parameters at the start before processing
 - Return early when possible to avoid deep nesting
 - Prefer composition over inheritance
-- Keep functions small and focused on a single responsibility
+- Function size preferences:
+  - Aim for functions around 50-60 lines when possible
+  - Don't break down functions too small as it can reduce readability
+  - Maintain focus on a single responsibility per function
 - Comment style: in-function comments should be lowercase sentences

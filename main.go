@@ -21,38 +21,58 @@ import (
 
 // Options holds command line options
 type Options struct {
-	Run struct {
+	Run	struct {
 		Args struct {
 			Patterns []string `positional-arg-name:"FILE/PATTERN" description:"Files or patterns to process (default: current directory)"`
 		} `positional-args:"yes"`
-	} `command:"run" description:"Process files in-place (default)"`
+	}	`command:"run" description:"Process files in-place (default)"`
 
-	Diff struct {
+	Diff	struct {
 		Args struct {
 			Patterns []string `positional-arg-name:"FILE/PATTERN" description:"Files or patterns to process (default: current directory)"`
 		} `positional-args:"yes"`
-	} `command:"diff" description:"Show diff without modifying files"`
+	}	`command:"diff" description:"Show diff without modifying files"`
 
-	Print struct {
+	Print	struct {
 		Args struct {
 			Patterns []string `positional-arg-name:"FILE/PATTERN" description:"Files or patterns to process (default: current directory)"`
 		} `positional-args:"yes"`
-	} `command:"print" description:"Print processed content to stdout"`
+	}	`command:"print" description:"Print processed content to stdout"`
 
-	Title  bool     `long:"title" description:"Convert only the first character to lowercase, keep the rest unchanged"`
-	Skip   []string `long:"skip" description:"Skip specified directories or files (can be used multiple times)"`
-	Format bool     `long:"fmt" description:"Run gofmt on processed files"`
+	Title	bool		`long:"title" description:"Convert only the first character to lowercase, keep the rest unchanged"`
+	Skip	[]string	`long:"skip" description:"Skip specified directories or files (can be used multiple times)"`
+	Format	bool		`long:"fmt" description:"Run gofmt on processed files"`
 
-	DryRun bool `long:"dry" description:"Don't modify files, just show what would be changed"`
+	DryRun	bool	`long:"dry" description:"Don't modify files, just show what would be changed"`
 }
 
-var osExit = os.Exit // replace os.Exit with a variable for testing
+var osExit = os.Exit	// replace os.Exit with a variable for testing
 
 func main() {
-	// define options
+	// parse command line options
+	opts, p := parseCommandLineOptions()
+	
+	// determine mode and file patterns to process
+	mode, args := determineProcessingMode(opts, p)
+	
+	// create process request with all options
+	req := ProcessRequest{
+		OutputMode:	mode,
+		TitleCase:	opts.Title,
+		Format:		opts.Format,
+		SkipPatterns:	opts.Skip,
+	}
+
+	// process each pattern
+	for _, pattern := range patterns(args) {
+		processPattern(pattern, req)
+	}
+}
+
+// parseCommandLineOptions parses command line arguments and returns options
+func parseCommandLineOptions() (Options, *flags.Parser) {
 	var opts Options
 	p := flags.NewParser(&opts, flags.Default)
-
 	p.LongDescription = "Convert in-function comments to lowercase while preserving comments outside functions"
 
 	// handle parsing errors
@@ -64,44 +84,36 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
 		osExit(1)
 	}
+	
+	return opts, p
+}
 
-	// determine the mode based on command or flags
-	mode := "inplace" // default
-
-	var args []string
-	// process according to command or flags
+// determineProcessingMode figures out the processing mode and file patterns
+func determineProcessingMode(opts Options, p *flags.Parser) (mode string, patterns []string) {
+	// default mode is inplace
+	mode = "inplace"
+	
+	// override with dry-run if specified
+	if opts.DryRun {
+		return "diff", opts.Run.Args.Patterns
+	}
+	
+	// process according to command if specified
 	if p.Command.Active != nil {
-		// command was specified
 		switch p.Command.Active.Name {
 		case "run":
 			mode = "inplace"
-			args = opts.Run.Args.Patterns
+			patterns = opts.Run.Args.Patterns
 		case "diff":
 			mode = "diff"
-			args = opts.Diff.Args.Patterns
+			patterns = opts.Diff.Args.Patterns
 		case "print":
 			mode = "print"
-			args = opts.Print.Args.Patterns
+			patterns = opts.Print.Args.Patterns
 		}
 	}
-
-	if opts.DryRun {
-		mode = "diff"
-		args = opts.Run.Args.Patterns
-	}
-
-	// create process request with all options
-	req := ProcessRequest{
-		OutputMode:   mode,
-		TitleCase:    opts.Title,
-		Format:       opts.Format,
-		SkipPatterns: opts.Skip,
-	}
-
-	// process each pattern
-	for _, pattern := range patterns(args) {
-		processPattern(pattern, req)
-	}
+	
+	return mode, patterns
 }
 
 // patterns to process, defaulting to current directory
@@ -115,35 +127,58 @@ func patterns(p []string) []string {
 
 // ProcessRequest contains all processing parameters
 type ProcessRequest struct {
-	OutputMode   string
-	TitleCase    bool
-	Format       bool
-	SkipPatterns []string
+	OutputMode	string
+	TitleCase	bool
+	Format		bool
+	SkipPatterns	[]string
 }
 
 // processPattern processes a single pattern
 func processPattern(pattern string, req ProcessRequest) {
-	// handle special "./..." pattern for recursive search
-	if pattern == "./..." {
-		walkDir(".", req)
-		return
-	}
-
-	// if it's a recursive pattern, handle it
-	if strings.HasSuffix(pattern, "/...") || strings.HasSuffix(pattern, "...") {
-		// extract the directory part
-		dir := strings.TrimSuffix(pattern, "/...")
-		dir = strings.TrimSuffix(dir, "...")
-		if dir == "" {
-			dir = "."
-		}
+	// handle recursive pattern cases
+	if isRecursivePattern(pattern) {
+		dir := extractDirectoryFromPattern(pattern)
 		walkDir(dir, req)
 		return
 	}
 
-	// initialize files slice
-	var files []string
+	// find files to process
+	files := findGoFilesFromPattern(pattern)
+	if len(files) == 0 {
+		fmt.Printf("No Go files found matching pattern: %s\n", pattern)
+		return
+	}
 
+	// process each file
+	for _, file := range files {
+		if !strings.HasSuffix(file, ".go") || shouldSkip(file, req.SkipPatterns) {
+			continue
+		}
+		processFile(file, req.OutputMode, req.TitleCase, req.Format)
+	}
+}
+
+// isRecursivePattern checks if a pattern is recursive (contains "...")
+func isRecursivePattern(pattern string) bool {
+	return pattern == "./..." || strings.HasSuffix(pattern, "/...") || strings.HasSuffix(pattern, "...")
+}
+
+// extractDirectoryFromPattern gets the directory part from a recursive pattern
+func extractDirectoryFromPattern(pattern string) string {
+	if pattern == "./..." {
+		return "."
+	}
+
+	dir := strings.TrimSuffix(pattern, "/...")
+	dir = strings.TrimSuffix(dir, "...")
+	if dir == "" {
+		dir = "."
+	}
+	return dir
+}
+
+// findGoFilesFromPattern finds Go files matching a pattern
+func findGoFilesFromPattern(pattern string) []string {
 	// first check if the pattern is a directory
 	fileInfo, err := os.Stat(pattern)
 	if err == nil && fileInfo.IsDir() {
@@ -153,36 +188,17 @@ func processPattern(pattern string, req ProcessRequest) {
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error finding Go files in %s: %v\n", pattern, err)
 		}
-		if len(matches) > 0 {
-			files = matches
-		}
-	} else {
-		// not a directory, try as a glob pattern
-		files, err = filepath.Glob(pattern)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error globbing pattern %s: %v\n", pattern, err)
-			return
-		}
+		return matches
 	}
 
-	if len(files) == 0 {
-		fmt.Printf("No Go files found matching pattern: %s\n", pattern)
-		return
+	// not a directory, try as a glob pattern
+	files, err := filepath.Glob(pattern)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error globbing pattern %s: %v\n", pattern, err)
+		return nil
 	}
 
-	// process each file
-	for _, file := range files {
-		if !strings.HasSuffix(file, ".go") {
-			continue
-		}
-
-		// check if file should be skipped
-		if shouldSkip(file, req.SkipPatterns) {
-			continue
-		}
-
-		processFile(file, req.OutputMode, req.TitleCase, req.Format)
-	}
+	return files
 }
 
 // walkDir recursively processes all .go files in directory and subdirectories
@@ -272,7 +288,7 @@ func formatWithGofmt(content string) string {
 	formattedBytes, err := cmd.Output()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error formatting with gofmt: %v\n", err)
-		return content // return original content on error
+		return content	// return original content on error
 	}
 
 	return string(formattedBytes)
@@ -288,11 +304,31 @@ func processFile(fileName, outputMode string, titleCase, format bool) {
 	}
 
 	// process comments
+	modified := processComments(node, titleCase)
+
+	// if no comments were modified, no need to proceed
+	if !modified {
+		return
+	}
+
+	// handle output based on specified mode
+	switch outputMode {
+	case "inplace":
+		handleInplaceMode(fileName, fset, node, format)
+	case "print":
+		handlePrintMode(fset, node, format)
+	case "diff":
+		handleDiffMode(fileName, fset, node, format)
+	}
+}
+
+// processComments processes all comments in the file and returns true if any were modified
+func processComments(node *ast.File, titleCase bool) bool {
 	modified := false
 	for _, commentGroup := range node.Comments {
 		for _, comment := range commentGroup.List {
 			// check if comment is inside a function
-			if isCommentInsideFunction(fset, node, comment) {
+			if isCommentInsideFunction(nil, node, comment) {
 				// process the comment text
 				orig := comment.Text
 				var processed string
@@ -308,83 +344,78 @@ func processFile(fileName, outputMode string, titleCase, format bool) {
 			}
 		}
 	}
+	return modified
+}
 
-	// if no comments were modified, no need to proceed
-	if !modified {
+// handleInplaceMode writes modified content back to the file
+func handleInplaceMode(fileName string, fset *token.FileSet, node *ast.File, format bool) {
+	file, err := os.Create(fileName)	//nolint:gosec
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error opening %s for writing: %v\n", fileName, err)
+		return
+	}
+	defer file.Close()
+
+	if err := printer.Fprint(file, fset, node); err != nil {
+		fmt.Fprintf(os.Stderr, "Error writing to file %s: %v\n", fileName, err)
 		return
 	}
 
-	// handle output based on specified mode
-	switch outputMode {
-	case "inplace":
-		// write modified source back to file
-		file, err := os.Create(fileName) //nolint:gosec
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error opening %s for writing: %v\n", fileName, err)
-			return
-		}
-		defer file.Close()
-		if err := printer.Fprint(file, fset, node); err != nil {
-			fmt.Fprintf(os.Stderr, "Error writing to file %s: %v\n", fileName, err)
-			return
-		}
-		fmt.Printf("Updated: %s\n", fileName)
+	fmt.Printf("Updated: %s\n", fileName)
 
-		// run gofmt if requested
-		if format {
-			runGoFmt(fileName)
-		}
-
-	case "print":
-		// print modified source to stdout
-		var modifiedBytes strings.Builder
-		if err := printer.Fprint(&modifiedBytes, fset, node); err != nil {
-			fmt.Fprintf(os.Stderr, "Error writing to stdout: %v\n", err)
-			return
-		}
-
-		// if format is requested, use our helper function
-		if format {
-			formattedContent := formatWithGofmt(modifiedBytes.String())
-			fmt.Print(formattedContent)
-		} else {
-			fmt.Print(modifiedBytes.String())
-		}
-
-	case "diff":
-		// generate diff output
-		origBytes, err := os.ReadFile(fileName) //nolint:gosec
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading original file %s: %v\n", fileName, err)
-			return
-		}
-
-		// generate modified content
-		var modifiedBytes strings.Builder
-		if err := printer.Fprint(&modifiedBytes, fset, node); err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating diff: %v\n", err)
-			return
-		}
-
-		// get original and modified content
-		originalContent := string(origBytes)
-		modifiedContent := modifiedBytes.String()
-
-		// apply formatting if requested
-		if format {
-			// format both original and modified content for consistency
-			originalContent = formatWithGofmt(originalContent)
-			modifiedContent = formatWithGofmt(modifiedContent)
-		}
-
-		// use cyan for file information
-		cyan := color.New(color.FgCyan, color.Bold).SprintFunc()
-		fmt.Printf("%s\n", cyan("--- "+fileName+" (original)"))
-		fmt.Printf("%s\n", cyan("+++ "+fileName+" (modified)"))
-
-		// print the diff with colors
-		fmt.Print(simpleDiff(originalContent, modifiedContent))
+	// run gofmt if requested
+	if format {
+		runGoFmt(fileName)
 	}
+}
+
+// handlePrintMode prints the modified content to stdout
+func handlePrintMode(fset *token.FileSet, node *ast.File, format bool) {
+	var modifiedBytes strings.Builder
+	if err := printer.Fprint(&modifiedBytes, fset, node); err != nil {
+		fmt.Fprintf(os.Stderr, "Error writing to stdout: %v\n", err)
+		return
+	}
+
+	content := modifiedBytes.String()
+	if format {
+		content = formatWithGofmt(content)
+	}
+	fmt.Print(content)
+}
+
+// handleDiffMode shows a diff between original and modified content
+func handleDiffMode(fileName string, fset *token.FileSet, node *ast.File, format bool) {
+	// read original content
+	origBytes, err := os.ReadFile(fileName)	//nolint:gosec
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading original file %s: %v\n", fileName, err)
+		return
+	}
+
+	// generate modified content
+	var modifiedBytes strings.Builder
+	if err := printer.Fprint(&modifiedBytes, fset, node); err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating diff: %v\n", err)
+		return
+	}
+
+	// get original and modified content
+	originalContent := string(origBytes)
+	modifiedContent := modifiedBytes.String()
+
+	// apply formatting if requested
+	if format {
+		// format both original and modified content for consistency
+		originalContent = formatWithGofmt(originalContent)
+		modifiedContent = formatWithGofmt(modifiedContent)
+	}
+
+	// display diff with colors
+	cyan := color.New(color.FgCyan, color.Bold).SprintFunc()
+	fmt.Printf("%s\n", cyan("--- "+fileName+" (original)"))
+	fmt.Printf("%s\n", cyan("+++ "+fileName+" (modified)"))
+	fmt.Print(simpleDiff(originalContent, modifiedContent))
 }
 
 // isCommentInsideFunction checks if a comment is inside a function declaration or a struct declaration
@@ -403,13 +434,13 @@ func isCommentInsideFunction(_ *token.FileSet, file *ast.File, comment *ast.Comm
 			// check if comment is inside function body
 			if node.Body != nil && node.Body.Lbrace <= commentPos && commentPos <= node.Body.Rbrace {
 				insideNode = true
-				return false // stop traversal
+				return false	// stop traversal
 			}
 		case *ast.StructType:
 			// check if comment is inside struct definition (between braces)
 			if node.Fields != nil && node.Fields.Opening <= commentPos && commentPos <= node.Fields.Closing {
 				insideNode = true
-				return false // stop traversal
+				return false	// stop traversal
 			}
 		}
 		return true
@@ -418,50 +449,112 @@ func isCommentInsideFunction(_ *token.FileSet, file *ast.File, comment *ast.Comm
 	return insideNode
 }
 
-// convertCommentToLowercase converts a comment to lowercase, preserving the comment markers
-// If comment starts with a special indicator like TODO, FIXME, etc. it remains unchanged
-func convertCommentToLowercase(comment string) string {
-	// list of special indicators that should be preserved
-	specialIndicators := []string{
-		"TODO", "FIXME", "HACK", "XXX", "NOTE", "BUG", "IDEA", "OPTIMIZE",
-		"REVIEW", "TEMP", "DEBUG", "NB", "WARNING", "DEPRECATED", "NOTICE",
+// specialIndicators that should be preserved in comments
+var specialIndicators = []string{
+	"TODO", "FIXME", "HACK", "XXX", "NOTE", "BUG", "IDEA", "OPTIMIZE",
+	"REVIEW", "TEMP", "DEBUG", "NB", "WARNING", "DEPRECATED", "NOTICE",
+}
+
+// hasSpecialIndicator checks if a comment starts with a special indicator
+func hasSpecialIndicator(content string) bool {
+	trimmedContent := strings.TrimSpace(content)
+	for _, indicator := range specialIndicators {
+		if strings.HasPrefix(trimmedContent, indicator) {
+			return true
+		}
+	}
+	return false
+}
+
+// processLineComment handles single line comments (// style)
+func processLineComment(content string, fullLowercase bool) string {
+	// check if this comment starts with a special indicator
+	if hasSpecialIndicator(content) {
+		// if comment starts with a special indicator, leave it unchanged
+		return "//" + content
 	}
 
-	if strings.HasPrefix(comment, "//") {
-		// single line comment
-		content := strings.TrimPrefix(comment, "//")
-
-		// check if this comment starts with a special indicator
-		trimmedContent := strings.TrimSpace(content)
-		for _, indicator := range specialIndicators {
-			if strings.HasPrefix(trimmedContent, indicator) {
-				// if comment starts with a special indicator, leave it unchanged
-				return comment
-			}
-		}
-
-		// otherwise convert to lowercase
+	if fullLowercase {
+		// convert entire comment to lowercase
 		return "//" + strings.ToLower(content)
 	}
 
-	if strings.HasPrefix(comment, "/*") && strings.HasSuffix(comment, "*/") {
-		// multi-line comment
-		content := strings.TrimSuffix(strings.TrimPrefix(comment, "/*"), "*/")
+	// for title case, convert only the first non-whitespace character
+	leadingWhitespace := ""
+	remainingContent := content
+	for i, r := range content {
+		if !unicode.IsSpace(r) {
+			leadingWhitespace = content[:i]
+			remainingContent = content[i:]
+			break
+		}
+	}
 
-		// check first line for special indicators
-		lines := strings.Split(content, "\n")
-		if len(lines) > 0 {
-			trimmedFirstLine := strings.TrimSpace(lines[0])
-			for _, indicator := range specialIndicators {
-				if strings.HasPrefix(trimmedFirstLine, indicator) {
-					// if first line starts with a special indicator, leave the comment unchanged
-					return comment
-				}
+	if remainingContent == "" {
+		return "//" + content
+	}
+
+	firstChar := strings.ToLower(string(remainingContent[0]))
+	if len(remainingContent) > 1 {
+		return "//" + leadingWhitespace + firstChar + remainingContent[1:]
+	}
+	return "//" + leadingWhitespace + firstChar
+}
+
+// processMultiLineComment handles multi-line comments (/* */ style)
+func processMultiLineComment(content string, fullLowercase bool) string {
+	lines := strings.Split(content, "\n")
+	if len(lines) == 0 {
+		return "/*" + content + "*/"
+	}
+
+	// check first line for special indicators
+	if hasSpecialIndicator(lines[0]) {
+		// if first line starts with a special indicator, leave the comment unchanged
+		return "/*" + content + "*/"
+	}
+
+	if fullLowercase {
+		// convert entire comment to lowercase
+		return "/*" + strings.ToLower(content) + "*/"
+	}
+
+	// for title case, only convert the first character of the first line
+	if lines[0] != "" {
+		leadingWhitespace := ""
+		remainingText := lines[0]
+		for i, r := range lines[0] {
+			if !unicode.IsSpace(r) {
+				leadingWhitespace = lines[0][:i]
+				remainingText = lines[0][i:]
+				break
 			}
 		}
 
-		// otherwise convert to lowercase
-		return "/*" + strings.ToLower(content) + "*/"
+		if remainingText != "" {
+			firstChar := strings.ToLower(string(remainingText[0]))
+			if len(remainingText) > 1 {
+				lines[0] = leadingWhitespace + firstChar + remainingText[1:]
+			} else {
+				lines[0] = leadingWhitespace + firstChar
+			}
+		}
+	}
+
+	return "/*" + strings.Join(lines, "\n") + "*/"
+}
+
+// convertCommentToLowercase converts a comment to lowercase, preserving the comment markers
+// If comment starts with a special indicator like TODO, FIXME, etc. it remains unchanged
+func convertCommentToLowercase(comment string) string {
+	if strings.HasPrefix(comment, "//") {
+		content := strings.TrimPrefix(comment, "//")
+		return processLineComment(content, true)
+	}
+
+	if strings.HasPrefix(comment, "/*") && strings.HasSuffix(comment, "*/") {
+		content := strings.TrimSuffix(strings.TrimPrefix(comment, "/*"), "*/")
+		return processMultiLineComment(content, true)
 	}
 
 	return comment
@@ -470,88 +563,14 @@ func convertCommentToLowercase(comment string) string {
 // convertCommentToTitleCase converts only the first character of a comment to lowercase,
 // If comment starts with a special indicator like TODO, FIXME, etc. it remains unchanged
 func convertCommentToTitleCase(comment string) string {
-	// list of special indicators that should be preserved
-	specialIndicators := []string{
-		"TODO", "FIXME", "HACK", "XXX", "NOTE", "BUG", "IDEA", "OPTIMIZE",
-		"REVIEW", "TEMP", "DEBUG", "NB", "WARNING", "DEPRECATED", "NOTICE",
-	}
-
 	if strings.HasPrefix(comment, "//") {
-		// single line comment
 		content := strings.TrimPrefix(comment, "//")
-
-		// check if this comment starts with a special indicator
-		trimmedContent := strings.TrimSpace(content)
-		for _, indicator := range specialIndicators {
-			if strings.HasPrefix(trimmedContent, indicator) {
-				// if comment starts with a special indicator, leave it unchanged
-				return comment
-			}
-		}
-
-		// otherwise convert only the first character to lowercase
-		leadingWhitespace := ""
-		remainingContent := content
-		for i, r := range content {
-			if !unicode.IsSpace(r) {
-				leadingWhitespace = content[:i]
-				remainingContent = content[i:]
-				break
-			}
-		}
-
-		if remainingContent != "" {
-			firstChar := strings.ToLower(string(remainingContent[0]))
-			if len(remainingContent) > 1 {
-				// keep the rest of the text as is
-				return "//" + leadingWhitespace + firstChar + remainingContent[1:]
-			}
-			return "//" + leadingWhitespace + firstChar
-		}
-		return "//" + content
+		return processLineComment(content, false)
 	}
 
 	if strings.HasPrefix(comment, "/*") && strings.HasSuffix(comment, "*/") {
-		// multi-line comment
 		content := strings.TrimSuffix(strings.TrimPrefix(comment, "/*"), "*/")
-
-		// check first line for special indicators
-		lines := strings.Split(content, "\n")
-		if len(lines) > 0 {
-			trimmedFirstLine := strings.TrimSpace(lines[0])
-			for _, indicator := range specialIndicators {
-				if strings.HasPrefix(trimmedFirstLine, indicator) {
-					// if first line starts with a special indicator, leave the comment unchanged
-					return comment
-				}
-			}
-
-			// process the first line - lowercase only the first character
-			if lines[0] != "" {
-				// find the first non-whitespace character
-				leadingWhitespace := ""
-				remainingText := lines[0]
-				for i, r := range lines[0] {
-					if !unicode.IsSpace(r) {
-						leadingWhitespace = lines[0][:i]
-						remainingText = lines[0][i:]
-						break
-					}
-				}
-
-				if remainingText != "" {
-					// convert only the first non-whitespace character to lowercase
-					firstChar := strings.ToLower(string(remainingText[0]))
-					if len(remainingText) > 1 {
-						lines[0] = leadingWhitespace + firstChar + remainingText[1:]
-					} else {
-						lines[0] = leadingWhitespace + firstChar
-					}
-				}
-			}
-		}
-
-		return "/*" + strings.Join(lines, "\n") + "*/"
+		return processMultiLineComment(content, false)
 	}
 
 	return comment
