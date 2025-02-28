@@ -1,8 +1,26 @@
-coverage.*
-test_file.go
-unfuck-ai-comments
-coverage.*
-coverage*.out
-test_file.go
-profile.cov_tmp
+# Build output
+.bin/
+bin/
+dist/
+
+# Generated files or temp files that might be created during build
+*.bak
 profile.cov
+profile.cov_tmp
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Temporary files that might be created during builds
+*.tar.gz
+*.zip
+*.deb
+*.rpm
+*.apk
