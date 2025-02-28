@@ -118,10 +118,11 @@ unfuck-ai-comments diff ./...
 
 ## Options
 
-- `--dry`:   Don't modify files, just show what would be changed (shortcut for diff command)
-- `--title`: Convert only the first character to lowercase, keep the rest unchanged
-- `--fmt`:   Format the output using "go fmt"
-- `--skip`:  Skip specified files or directories (can be used multiple times)
+- `--dry`:     Don't modify files, just show what would be changed (shortcut for diff command)
+- `--title`:   Convert only the first character to lowercase, keep the rest unchanged
+- `--fmt`:     Format the output using "go fmt"
+- `--skip`:    Skip specified files or directories (can be used multiple times)
+- `--backup`:  Create .bak backup files for any files that are modified
 
 - `--help` or `-h`: Show usage information
 
@@ -150,6 +151,11 @@ unfuck-ai-comments --title run ./...
 Skip specific files or directories:
 ```
 unfuck-ai-comments run ./... --skip vendor --skip "*_test.go"
+```
+
+Create backup (.bak) files when modifying:
+```
+unfuck-ai-comments run --backup ./...
 ```
 
 ## How it works
