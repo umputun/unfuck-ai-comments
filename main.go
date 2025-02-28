@@ -51,10 +51,10 @@ var osExit = os.Exit	// replace os.Exit with a variable for testing
 func main() {
 	// parse command line options
 	opts, p := parseCommandLineOptions()
-	
+
 	// determine mode and file patterns to process
 	mode, args := determineProcessingMode(opts, p)
-	
+
 	// create process request with all options
 	req := ProcessRequest{
 		OutputMode:	mode,
@@ -65,7 +65,13 @@ func main() {
 
 	// process each pattern
 	for _, pattern := range patterns(args) {
-		processPattern(pattern, req)
+		processPattern(pattern, &req)
+	}
+
+	// print summary for run and diff modes (not print mode)
+	if mode == "inplace" || mode == "diff" {
+		fmt.Printf("\nSummary: %d files analyzed, %d files updated, %d total changes\n",
+			req.FilesAnalyzed, req.FilesUpdated, req.TotalChanges)
 	}
 }
 
@@ -84,7 +90,7 @@ func parseCommandLineOptions() (Options, *flags.Parser) {
 		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
 		osExit(1)
 	}
-	
+
 	return opts, p
 }
 
@@ -92,12 +98,12 @@ func parseCommandLineOptions() (Options, *flags.Parser) {
 func determineProcessingMode(opts Options, p *flags.Parser) (mode string, patterns []string) {
 	// default mode is inplace
 	mode = "inplace"
-	
+
 	// override with dry-run if specified
 	if opts.DryRun {
 		return "diff", opts.Run.Args.Patterns
 	}
-	
+
 	// process according to command if specified
 	if p.Command.Active != nil {
 		switch p.Command.Active.Name {
@@ -112,7 +118,7 @@ func determineProcessingMode(opts Options, p *flags.Parser) (mode string, patter
 			patterns = opts.Print.Args.Patterns
 		}
 	}
-	
+
 	return mode, patterns
 }
 
@@ -131,10 +137,15 @@ type ProcessRequest struct {
 	TitleCase	bool
 	Format		bool
 	SkipPatterns	[]string
+
+	// statistics for final summary
+	FilesAnalyzed	int
+	FilesUpdated	int
+	TotalChanges	int
 }
 
 // processPattern processes a single pattern
-func processPattern(pattern string, req ProcessRequest) {
+func processPattern(pattern string, req *ProcessRequest) {
 	// handle recursive pattern cases
 	if isRecursivePattern(pattern) {
 		dir := extractDirectoryFromPattern(pattern)
@@ -154,7 +165,14 @@ func processPattern(pattern string, req ProcessRequest) {
 		if !strings.HasSuffix(file, ".go") || shouldSkip(file, req.SkipPatterns) {
 			continue
 		}
-		processFile(file, req.OutputMode, req.TitleCase, req.Format)
+
+		req.FilesAnalyzed++
+		changes := processFile(file, req.OutputMode, req.TitleCase, req.Format)
+
+		if changes > 0 {
+			req.FilesUpdated++
+			req.TotalChanges += changes
+		}
 	}
 }
 
@@ -202,7 +220,7 @@ func findGoFilesFromPattern(pattern string) []string {
 }
 
 // walkDir recursively processes all .go files in directory and subdirectories
-func walkDir(dir string, req ProcessRequest) {
+func walkDir(dir string, req *ProcessRequest) {
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -223,7 +241,14 @@ func walkDir(dir string, req ProcessRequest) {
 			if shouldSkip(path, req.SkipPatterns) {
 				return nil
 			}
-			processFile(path, req.OutputMode, req.TitleCase, req.Format)
+
+			req.FilesAnalyzed++
+			changes := processFile(path, req.OutputMode, req.TitleCase, req.Format)
+
+			if changes > 0 {
+				req.FilesUpdated++
+				req.TotalChanges += changes
+			}
 		}
 		return nil
 	})
@@ -294,21 +319,21 @@ func formatWithGofmt(content string) string {
 	return string(formattedBytes)
 }
 
-func processFile(fileName, outputMode string, titleCase, format bool) {
+func processFile(fileName, outputMode string, titleCase, format bool) int {
 	// parse the file
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, fileName, nil, parser.ParseComments)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error parsing %s: %v\n", fileName, err)
-		return
+		return 0
 	}
 
 	// process comments
-	modified := processComments(node, titleCase)
+	numChanges, modified := processComments(node, titleCase)
 
 	// if no comments were modified, no need to proceed
 	if !modified {
-		return
+		return 0
 	}
 
 	// handle output based on specified mode
@@ -320,11 +345,16 @@ func processFile(fileName, outputMode string, titleCase, format bool) {
 	case "diff":
 		handleDiffMode(fileName, fset, node, format)
 	}
+
+	return numChanges
 }
 
-// processComments processes all comments in the file and returns true if any were modified
-func processComments(node *ast.File, titleCase bool) bool {
+// processComments processes all comments in the file
+// returns the number of changes made and whether any modifications were made
+func processComments(node *ast.File, titleCase bool) (int, bool) {
 	modified := false
+	changeCount := 0
+
 	for _, commentGroup := range node.Comments {
 		for _, comment := range commentGroup.List {
 			// check if comment is inside a function
@@ -340,11 +370,12 @@ func processComments(node *ast.File, titleCase bool) bool {
 				if orig != processed {
 					comment.Text = processed
 					modified = true
+					changeCount++
 				}
 			}
 		}
 	}
-	return modified
+	return changeCount, modified
 }
 
 // handleInplaceMode writes modified content back to the file
