@@ -638,6 +638,28 @@ func processLineComment(content string, fullLowercase bool) string {
 		return "//" + content
 	}
 
+	// check if the first word is all uppercase (for abbreviations like AI, CPU)
+	firstWordEnd := 0
+	isAllUppercase := true
+	for i, r := range remainingContent {
+		if unicode.IsSpace(r) || !unicode.IsLetter(r) {
+			firstWordEnd = i
+			break
+		}
+		if !unicode.IsUpper(r) {
+			isAllUppercase = false
+		}
+		if i == len(remainingContent)-1 {
+			firstWordEnd = i + 1 // handle case where comment is a single word
+		}
+	}
+
+	// if first word is all uppercase and at least 2 characters, preserve it
+	if isAllUppercase && firstWordEnd >= 2 {
+		return "//" + content
+	}
+
+	// otherwise convert first character to lowercase
 	firstChar := strings.ToLower(string(remainingContent[0]))
 	if len(remainingContent) > 1 {
 		return "//" + leadingWhitespace + firstChar + remainingContent[1:]
@@ -676,11 +698,31 @@ func processMultiLineComment(content string, fullLowercase bool) string {
 		}
 
 		if remainingText != "" {
-			firstChar := strings.ToLower(string(remainingText[0]))
-			if len(remainingText) > 1 {
-				lines[0] = leadingWhitespace + firstChar + remainingText[1:]
-			} else {
-				lines[0] = leadingWhitespace + firstChar
+			// check if the first word is all uppercase (for abbreviations like AI, CPU)
+			firstWordEnd := 0
+			isAllUppercase := true
+			for i, r := range remainingText {
+				if unicode.IsSpace(r) || !unicode.IsLetter(r) {
+					firstWordEnd = i
+					break
+				}
+				if !unicode.IsUpper(r) {
+					isAllUppercase = false
+				}
+				if i == len(remainingText)-1 {
+					firstWordEnd = i + 1 // handle case where comment is a single word
+				}
+			}
+
+			// if first word is all uppercase and at least 2 characters, preserve it
+			if !(isAllUppercase && firstWordEnd >= 2) {
+				// convert first character to lowercase only if not all uppercase
+				firstChar := strings.ToLower(string(remainingText[0]))
+				if len(remainingText) > 1 {
+					lines[0] = leadingWhitespace + firstChar + remainingText[1:]
+				} else {
+					lines[0] = leadingWhitespace + firstChar
+				}
 			}
 		}
 	}
