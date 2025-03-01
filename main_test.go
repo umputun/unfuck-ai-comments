@@ -348,12 +348,6 @@ func TestConvertCommentToTitleCase(t *testing.T) {
 	}
 }
 
-// Helper function to remove whitespace for comparison
-func removeWhitespace(s string) string {
-	re := regexp.MustCompile(`\s+`)
-	return re.ReplaceAllString(s, "")
-}
-
 // TestProcessFile tests the main processing function with different modes
 func TestProcessFile(t *testing.T) {
 	// create a temporary directory for test files
@@ -870,6 +864,13 @@ func Example(  ) {
 // TestCLIInvocation tests the CLI by simulating command line invocation
 // This tests the whole process without calling main() directly
 func TestCLIInvocation(t *testing.T) {
+
+	// helper function to remove whitespace for comparison
+	removeWhitespace := func(s string) string {
+		re := regexp.MustCompile(`\s+`)
+		return re.ReplaceAllString(s, "")
+	}
+
 	// create a temporary directory for test files
 	tempDir := t.TempDir()
 
@@ -1198,7 +1199,7 @@ func TestSampleGo(t *testing.T) {
 		"First word should be lowercase while identifiers preserved")
 }
 
-// TestHelperFunctions tests the helper functions added for pattern processing
+// TestHelperFunctions tests the helper functions for pattern processing
 func TestHelperFunctions(t *testing.T) {
 	t.Run("isRecursivePattern", func(t *testing.T) {
 		tests := []struct {
