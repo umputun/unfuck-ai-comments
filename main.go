@@ -294,8 +294,9 @@ func walkDir(dir string, req *ProcessRequest, writers OutputWriters) {
 			return err
 		}
 
-		// skip vendor directories
-		if info.IsDir() && (info.Name() == "vendor" || strings.Contains(path, "/vendor/")) {
+		// skip vendor and testdata directories
+		if info.IsDir() && (info.Name() == "vendor" || strings.Contains(path, "/vendor/") || 
+			info.Name() == "testdata" || strings.Contains(path, "/testdata/")) {
 			return filepath.SkipDir
 		}
 

@@ -1860,6 +1860,87 @@ func TestSimpleDiff(t *testing.T) {
 	}
 }
 
+// TestVendorAndTestdataExclusion tests that vendor and testdata directories are automatically excluded
+func TestVendorAndTestdataExclusion(t *testing.T) {
+	// create a temporary directory structure for tests
+	tempDir := t.TempDir()
+
+	// create directories
+	rootDir := filepath.Join(tempDir, "root")
+	vendorDir := filepath.Join(rootDir, "vendor")
+	testdataDir := filepath.Join(rootDir, "testdata")
+	normalDir := filepath.Join(rootDir, "normal")
+
+	for _, dir := range []string{rootDir, vendorDir, testdataDir, normalDir} {
+		err := os.MkdirAll(dir, 0o750)
+		require.NoError(t, err, "Failed to create directory: "+dir)
+	}
+
+	// create test go files with comments
+	files := map[string]string{
+		filepath.Join(rootDir, "root.go"):         "package main\n\nfunc Root() {\n\t// THIS ROOT COMMENT\n}\n",
+		filepath.Join(vendorDir, "vendor.go"):     "package vendor\n\nfunc Vendor() {\n\t// THIS VENDOR COMMENT\n}\n",
+		filepath.Join(testdataDir, "testdata.go"): "package testdata\n\nfunc TestData() {\n\t// THIS TESTDATA COMMENT\n}\n",
+		filepath.Join(normalDir, "normal.go"):     "package normal\n\nfunc Normal() {\n\t// THIS NORMAL COMMENT\n}\n",
+	}
+
+	for path, content := range files {
+		err := os.WriteFile(path, []byte(content), 0o600)
+		require.NoError(t, err, "Failed to create test file: "+path)
+	}
+
+	// save current directory
+	currentDir, err := os.Getwd()
+	require.NoError(t, err)
+
+	// change to root dir
+	err = os.Chdir(rootDir)
+	require.NoError(t, err)
+	defer func() {
+		err := os.Chdir(currentDir)
+		require.NoError(t, err, "Failed to restore original directory")
+	}()
+
+	// capture output using buffer writers
+	var stdoutBuf, stderrBuf bytes.Buffer
+	writers := OutputWriters{
+		Stdout: &stdoutBuf,
+		Stderr: &stderrBuf,
+	}
+
+	// process recursively (which should automatically skip vendor and testdata)
+	req := ProcessRequest{
+		OutputMode:   "inplace",
+		TitleCase:    false,
+		Format:       false,
+		SkipPatterns: []string{},
+	}
+	processPattern("./...", &req, writers)
+
+	// check that files in root and normal directories were processed
+	content, err := os.ReadFile("root.go")
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "// this root comment",
+		"Root directory file should be processed")
+
+	content, err = os.ReadFile(filepath.Join("normal", "normal.go"))
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "// this normal comment",
+		"Normal directory file should be processed")
+
+	// check that vendor directory files were NOT processed (should retain uppercase)
+	content, err = os.ReadFile(filepath.Join("vendor", "vendor.go"))
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "// THIS VENDOR COMMENT",
+		"Vendor directory file should NOT be processed")
+
+	// check that testdata directory files were NOT processed (should retain uppercase)
+	content, err = os.ReadFile(filepath.Join("testdata", "testdata.go"))
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "// THIS TESTDATA COMMENT",
+		"Testdata directory file should NOT be processed")
+}
+
 // TestWithSampleFile tests the tool against a sample file
 func TestWithSampleFile(t *testing.T) {
 	// create a temporary directory for tests
