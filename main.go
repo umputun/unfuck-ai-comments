@@ -611,6 +611,7 @@ func hasSpecialIndicator(content string) bool {
 }
 
 // processLineComment handles single line comments (// style)
+// it gets the content after "//" and processes it
 func processLineComment(content string, fullLowercase bool) string {
 	// check if this comment starts with a special indicator
 	if hasSpecialIndicator(content) {
@@ -618,9 +619,16 @@ func processLineComment(content string, fullLowercase bool) string {
 		return "//" + content
 	}
 
+	// extract identifiers from the comment, which are words with pascal or camel case. we want to preserve them
+	identifiers := getCommentIdentifiers(content)
+
 	if fullLowercase {
 		// convert entire comment to lowercase
-		return "//" + strings.ToLower(content)
+		res := strings.ToLower(content)
+		for _, id := range identifiers {
+			res = strings.ReplaceAll(res, strings.ToLower(id), id)
+		}
+		return "//" + res
 	}
 
 	// for title case, convert only the first non-whitespace character
@@ -659,12 +667,68 @@ func processLineComment(content string, fullLowercase bool) string {
 		return "//" + content
 	}
 
+	// check if the first word is in identifiers and preserve it
+	for _, id := range identifiers {
+		if strings.EqualFold(id, remainingContent[:firstWordEnd]) {
+			return "//" + content
+		}
+	}
+
 	// otherwise convert first character to lowercase
 	firstChar := strings.ToLower(string(remainingContent[0]))
 	if len(remainingContent) > 1 {
 		return "//" + leadingWhitespace + firstChar + remainingContent[1:]
 	}
 	return "//" + leadingWhitespace + firstChar
+}
+
+// getCommentIdentifiers extracts identifiers from a comment
+// identifiers are words with either pascal case or camel case
+func getCommentIdentifiers(content string) []string {
+	isPascalCase := func(s string) bool {
+		// pascal case requires uppercase first letter, at least one more uppercase letter
+		// followed by lowercase, and no consecutive uppercase letters
+		if len(s) < 2 || !unicode.IsUpper(rune(s[0])) {
+			return false
+		}
+
+		foundSecondUpper := false
+		for i := 1; i < len(s); i++ {
+			// check for consecutive uppercase letters (which invalidates pascal case)
+			if unicode.IsUpper(rune(s[i])) && i > 0 && unicode.IsUpper(rune(s[i-1])) {
+				return false
+			}
+
+			// valid pattern: uppercase followed by lowercase
+			if unicode.IsUpper(rune(s[i])) && i+1 < len(s) && unicode.IsLower(rune(s[i+1])) {
+				foundSecondUpper = true
+			}
+		}
+
+		return foundSecondUpper
+	}
+
+	isCamelCase := func(s string) bool {
+		// if at least one uppercase letter is found, and it's not the first character, it's camel case
+		for i, r := range s {
+			if i == 0 && unicode.IsUpper(r) {
+				return false
+			}
+			if unicode.IsUpper(r) && i > 0 {
+				return true
+			}
+		}
+		return false
+	}
+
+	words := strings.Fields(content)
+	var identifiers []string
+	for _, word := range words {
+		if isPascalCase(word) || isCamelCase(word) {
+			identifiers = append(identifiers, word)
+		}
+	}
+	return identifiers
 }
 
 // convertCommentToLowercase converts a comment to lowercase, preserving the comment markers

@@ -57,4 +57,10 @@ func helperFunction() {
 	// ALL CAPS COMMENT should be converted
 
 	// Another comment TO BE converted
+
+	// Example with camelCase and PascalCase identifiers
+	someVariableName := "camelCase" // camelCase should be preserved
+	OtherVariable := "PascalCase"   // PascalCase should be preserved
+	_ = someVariableName
+	_ = OtherVariable
 }

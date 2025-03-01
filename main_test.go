@@ -129,6 +129,11 @@ func TestConvertCommentToLowercase(t *testing.T) {
 			expected: "// upper case comment",
 		},
 		{
+			name:     "preserve camel and pascal comment",
+			input:    "// This pascalCase, and CamelCase partially Converted",
+			expected: "// this pascalCase, and CamelCase partially converted",
+		},
+		{
 			name:     "comment with special chars",
 			input:    "// Special: @#$%^&*()",
 			expected: "// special: @#$%^&*()",
@@ -173,6 +178,27 @@ func TestConvertCommentToLowercase(t *testing.T) {
 			input:    "// This is a TODO",
 			expected: "// this is a todo", // todo is only preserved at start of comment
 		},
+		// additional test cases for camelCase and PascalCase identifiers
+		{
+			name:     "camelCase identifier in lowercase mode",
+			input:    "// Example uses someVariableName for testing",
+			expected: "// example uses someVariableName for testing", // camelCase preserved
+		},
+		{
+			name:     "PascalCase identifier in lowercase mode",
+			input:    "// Using OtherVariable in the code",
+			expected: "// using OtherVariable in the code", // pascalCase preserved
+		},
+		{
+			name:     "mixed case with identifiers",
+			input:    "// USING someVariableName AND OtherVariable TOGETHER",
+			expected: "// using someVariableName and OtherVariable together", // identifiers preserved, rest lowercase
+		},
+		{
+			name:     "inline comment with identifier",
+			input:    "// Initialize someVariableName here",
+			expected: "// initialize someVariableName here",
+		},
 	}
 
 	for _, test := range tests {
@@ -199,6 +225,21 @@ func TestConvertCommentToTitleCase(t *testing.T) {
 			name:     "uppercase first letter with mixed case",
 			input:    "// UPPEr case comment",
 			expected: "// uPPEr case comment",
+		},
+		{
+			name:     "preserve camel and pascal comment in the middle",
+			input:    "// This pascalCase, and CamelCase partially Converted",
+			expected: "// this pascalCase, and CamelCase partially Converted",
+		},
+		{
+			name:     "preserve camel",
+			input:    "// CamelCase partially Converted",
+			expected: "// CamelCase partially Converted",
+		},
+		{
+			name:     "preserve pascal",
+			input:    "// pascalCase partially Converted",
+			expected: "// pascalCase partially Converted",
 		},
 		{
 			name:     "comment with special chars",
@@ -275,6 +316,27 @@ func TestConvertCommentToTitleCase(t *testing.T) {
 			name:     "multiline with uppercase first word",
 			input:    "/* API documentation\nSecond line */",
 			expected: "/* API documentation\nSecond line */", // should not change all-uppercase words in multiline
+		},
+		// additional test cases for camelCase and PascalCase identifiers
+		{
+			name:     "camelCase identifier at comment start",
+			input:    "// someVariableName should be preserved",
+			expected: "// someVariableName should be preserved", // should preserve camelCase
+		},
+		{
+			name:     "PascalCase identifier at comment start",
+			input:    "// OtherVariable should be preserved",
+			expected: "// OtherVariable should be preserved", // should preserve PascalCase
+		},
+		{
+			name:     "camelCase and PascalCase identifiers in middle",
+			input:    "// Using someVariableName and OtherVariable in code",
+			expected: "// using someVariableName and OtherVariable in code", // only first word should be lowercase
+		},
+		{
+			name:     "multiple camelCase and PascalCase identifiers",
+			input:    "// The someVariableName, OtherVariable, and anotherCamelCase example",
+			expected: "// the someVariableName, OtherVariable, and anotherCamelCase example", // preserve all identifiers
 		},
 	}
 
@@ -1078,6 +1140,62 @@ func Test() {
 			tc.verify(output)
 		})
 	}
+}
+
+// TestSampleGo tests processing of testdata/sample.go to verify identifier preservation
+func TestSampleGo(t *testing.T) {
+	// get path to testdata/sample.go
+	currentDir, err := os.Getwd()
+	require.NoError(t, err, "Failed to get working directory")
+
+	samplePath := filepath.Join(currentDir, "testdata", "sample.go")
+
+	// verify the sample file exists
+	_, err = os.Stat(samplePath)
+	require.NoError(t, err, "Sample file not found at "+samplePath)
+
+	// create a temporary copy of the sample file
+	tempDir := t.TempDir()
+	tempFile := filepath.Join(tempDir, "sample_test.go")
+
+	// read the original file
+	originalContent, err := os.ReadFile(samplePath)
+	require.NoError(t, err, "Failed to read sample file")
+
+	// write to the temporary location
+	err = os.WriteFile(tempFile, originalContent, 0o600)
+	require.NoError(t, err, "Failed to write temporary sample file")
+
+	// process the file
+	var stdoutBuf, stderrBuf bytes.Buffer
+	writers := OutputWriters{
+		Stdout: &stdoutBuf,
+		Stderr: &stderrBuf,
+	}
+
+	// process with title case mode (preserves camelCase and PascalCase)
+	processFile(tempFile, "print", true, false, writers)
+
+	// get the processed content
+	processedContent := stdoutBuf.String()
+
+	// check for camelCase and PascalCase preservation
+	assert.Contains(t, processedContent, "camelCase should be preserved",
+		"camelCase identifier should be preserved")
+	assert.Contains(t, processedContent, "PascalCase should be preserved",
+		"PascalCase identifier should be preserved")
+	assert.Contains(t, processedContent, "someVariableName",
+		"camelCase variable name should be preserved")
+	assert.Contains(t, processedContent, "OtherVariable",
+		"PascalCase variable name should be preserved")
+
+	// check that regular words are converted
+	assert.Contains(t, processedContent, "// example with",
+		"Regular words should be lowercase")
+
+	// verify specific comment that demonstrates both lowercase conversion and identifier preservation
+	assert.Contains(t, processedContent, "// example with camelCase and PascalCase identifiers",
+		"First word should be lowercase while identifiers preserved")
 }
 
 // TestHelperFunctions tests the helper functions added for pattern processing
@@ -1994,4 +2112,66 @@ func TestOutputWriters(t *testing.T) {
 		assert.Equal(t, "test stdout", stdoutBuf.String(), "Should capture stdout content")
 		assert.Equal(t, "test stderr", stderrBuf.String(), "Should capture stderr content")
 	})
+}
+
+func TestGetCommentIdentifiers(t *testing.T) {
+	tests := []struct {
+		name     string
+		content  string
+		expected []string
+	}{
+		{
+			name:     "extracts pascal case identifiers",
+			content:  "This is a TestFunction with PascalCase",
+			expected: []string{"TestFunction", "PascalCase"},
+		},
+		{
+			name:     "no identifiers, but CAPS words",
+			content:  " This SHOULD Be Converted",
+			expected: []string{},
+		},
+		{
+			name:     "strange UPPEr case comment",
+			content:  "UPPEr case comment",
+			expected: []string{},
+		},
+
+		{
+			name:     "extracts camel case identifiers",
+			content:  "this is a testFunction with camelCase",
+			expected: []string{"testFunction", "camelCase"},
+		},
+		{
+			name:     "extracts mixed case identifiers",
+			content:  "This is a testFunction with MixedCase and camelCase",
+			expected: []string{"testFunction", "MixedCase", "camelCase"},
+		},
+		{
+			name:     "ignores non-identifier words",
+			content:  "this is a simple comment without identifiers",
+			expected: []string{},
+		},
+		{
+			name:     "handles empty content",
+			content:  "",
+			expected: []string{},
+		},
+		{
+			name:     "handles content with special characters",
+			content:  "This is a testFunction_with_specialCharacters and camelCase",
+			expected: []string{"testFunction_with_specialCharacters", "camelCase"},
+		},
+		{
+			name:     "handles content with numbers",
+			content:  "This is a testFunction1 with camelCase2",
+			expected: []string{"testFunction1", "camelCase2"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getCommentIdentifiers(tt.content)
+			assert.ElementsMatch(t, tt.expected, result)
+		})
+	}
 }
