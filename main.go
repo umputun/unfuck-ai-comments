@@ -431,7 +431,7 @@ func processComments(node *ast.File, titleCase bool) (int, bool) {
 	for _, commentGroup := range node.Comments {
 		for _, comment := range commentGroup.List {
 			// check if comment is inside a function
-			if isCommentInsideFunction(node, comment) {
+			if isCommentInsideFunctionOrStruct(node, comment) {
 				// process the comment text
 				orig := comment.Text
 				var processed string
@@ -562,8 +562,8 @@ func handleDiffMode(fileName string, fset *token.FileSet, node *ast.File, format
 	fmt.Fprint(writers.Stdout, simpleDiff(originalContent, modifiedContent))
 }
 
-// isCommentInsideFunction checks if a comment is inside a function declaration or a struct declaration
-func isCommentInsideFunction(file *ast.File, comment *ast.Comment) bool {
+// isCommentInsideFunctionOrStruct checks if a comment is inside a function declaration or a struct declaration
+func isCommentInsideFunctionOrStruct(file *ast.File, comment *ast.Comment) bool {
 	commentPos := comment.Pos()
 
 	// find if comment is inside a function or struct
@@ -667,69 +667,6 @@ func processLineComment(content string, fullLowercase bool) string {
 	return "//" + leadingWhitespace + firstChar
 }
 
-// processMultiLineComment handles multi-line comments (/* */ style)
-func processMultiLineComment(content string, fullLowercase bool) string {
-	lines := strings.Split(content, "\n")
-	if len(lines) == 0 {
-		return "/*" + content + "*/"
-	}
-
-	// check first line for special indicators
-	if hasSpecialIndicator(lines[0]) {
-		// if first line starts with a special indicator, leave the comment unchanged
-		return "/*" + content + "*/"
-	}
-
-	if fullLowercase {
-		// convert entire comment to lowercase
-		return "/*" + strings.ToLower(content) + "*/"
-	}
-
-	// for title case, only convert the first character of the first line
-	if lines[0] != "" {
-		leadingWhitespace := ""
-		remainingText := lines[0]
-		for i, r := range lines[0] {
-			if !unicode.IsSpace(r) {
-				leadingWhitespace = lines[0][:i]
-				remainingText = lines[0][i:]
-				break
-			}
-		}
-
-		if remainingText != "" {
-			// check if the first word is all uppercase (for abbreviations like AI, CPU)
-			firstWordEnd := 0
-			isAllUppercase := true
-			for i, r := range remainingText {
-				if unicode.IsSpace(r) || !unicode.IsLetter(r) {
-					firstWordEnd = i
-					break
-				}
-				if !unicode.IsUpper(r) {
-					isAllUppercase = false
-				}
-				if i == len(remainingText)-1 {
-					firstWordEnd = i + 1 // handle case where comment is a single word
-				}
-			}
-
-			// if first word is all uppercase and at least 2 characters, preserve it
-			if !(isAllUppercase && firstWordEnd >= 2) {
-				// convert first character to lowercase only if not all uppercase
-				firstChar := strings.ToLower(string(remainingText[0]))
-				if len(remainingText) > 1 {
-					lines[0] = leadingWhitespace + firstChar + remainingText[1:]
-				} else {
-					lines[0] = leadingWhitespace + firstChar
-				}
-			}
-		}
-	}
-
-	return "/*" + strings.Join(lines, "\n") + "*/"
-}
-
 // convertCommentToLowercase converts a comment to lowercase, preserving the comment markers
 // If comment starts with a special indicator like TODO, FIXME, etc. it remains unchanged
 func convertCommentToLowercase(comment string) string {
@@ -737,12 +674,6 @@ func convertCommentToLowercase(comment string) string {
 		content := strings.TrimPrefix(comment, "//")
 		return processLineComment(content, true)
 	}
-
-	if strings.HasPrefix(comment, "/*") && strings.HasSuffix(comment, "*/") {
-		content := strings.TrimSuffix(strings.TrimPrefix(comment, "/*"), "*/")
-		return processMultiLineComment(content, true)
-	}
-
 	return comment
 }
 
@@ -753,12 +684,6 @@ func convertCommentToTitleCase(comment string) string {
 		content := strings.TrimPrefix(comment, "//")
 		return processLineComment(content, false)
 	}
-
-	if strings.HasPrefix(comment, "/*") && strings.HasSuffix(comment, "*/") {
-		content := strings.TrimSuffix(strings.TrimPrefix(comment, "/*"), "*/")
-		return processMultiLineComment(content, false)
-	}
-
 	return comment
 }
 

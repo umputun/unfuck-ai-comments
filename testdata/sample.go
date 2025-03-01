@@ -20,11 +20,6 @@ func (ex *Remote) Close() error {
 	// ANOTHER Strange Function
 	x := 1 // INLINE COMMENT that SHOULD be converted
 	_ = x
-	/*
-	 * THIS is a multi-line comment
-	 * THAT SHOULD BE converted
-	 */
-
 	return nil
 }
 

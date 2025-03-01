@@ -93,7 +93,7 @@ func ComplexFunc() {
 	// check all comments using classification patterns
 	for _, commentGroup := range file.Comments {
 		for _, comment := range commentGroup.List {
-			inside := isCommentInsideFunction(file, comment)
+			inside := isCommentInsideFunctionOrStruct(file, comment)
 			text := comment.Text
 
 			// check if classification is correct
@@ -124,11 +124,6 @@ func TestConvertCommentToLowercase(t *testing.T) {
 			expected: "// this should be converted",
 		},
 		{
-			name:     "multi-line comment",
-			input:    "/* This SHOULD\nBe Converted */",
-			expected: "/* this should\nbe converted */",
-		},
-		{
 			name:     "preserve comment markers",
 			input:    "// UPPER case comment",
 			expected: "// upper case comment",
@@ -154,11 +149,6 @@ func TestConvertCommentToLowercase(t *testing.T) {
 			expected: "//  leading space",
 		},
 		{
-			name:     "multi-line with indentation",
-			input:    "/*\n * line 1\n * Line 2\n */",
-			expected: "/*\n * line 1\n * line 2\n */",
-		},
-		{
 			name:     "not a comment",
 			input:    "const X = 1",
 			expected: "const X = 1", // should return unchanged
@@ -172,11 +162,6 @@ func TestConvertCommentToLowercase(t *testing.T) {
 			name:     "FIXME comment",
 			input:    "// FIXME This needs FIXING",
 			expected: "// FIXME This needs FIXING", // leave unchanged due to special indicator
-		},
-		{
-			name:     "multi-line TODO comment",
-			input:    "/*\n * TODO Fix this issue\n * Another line\n */",
-			expected: "/*\n * todo fix this issue\n * another line\n */", // currently multi-line indicators are not preserved
 		},
 		{
 			name:     "TODO with punctuation",
@@ -209,11 +194,6 @@ func TestConvertCommentToTitleCase(t *testing.T) {
 			name:     "single line comment",
 			input:    "// This SHOULD Be Converted",
 			expected: "// this SHOULD Be Converted",
-		},
-		{
-			name:     "multi-line comment",
-			input:    "/* This SHOULD\nBe Converted */",
-			expected: "/* this SHOULD\nBe Converted */",
 		},
 		{
 			name:     "uppercase first letter with mixed case",
@@ -1276,59 +1256,6 @@ func TestHelperFunctions(t *testing.T) {
 			})
 		}
 	})
-
-	t.Run("processMultiLineComment", func(t *testing.T) {
-		tests := []struct {
-			name          string
-			content       string
-			fullLowercase bool
-			expected      string
-		}{
-			{
-				name:          "full lowercase conversion",
-				content:       "THIS Should\nBE Lowercase",
-				fullLowercase: true,
-				expected:      "/*this should\nbe lowercase*/",
-			},
-			{
-				name:          "title case conversion",
-				content:       "THIs Should\nBE Lowercase",
-				fullLowercase: false,
-				expected:      "/*tHIs Should\nBE Lowercase*/",
-			},
-			{
-				name:          "special indicator preserved",
-				content:       "TODO: Fix this\nAnother line",
-				fullLowercase: true,
-				expected:      "/*TODO: Fix this\nAnother line*/",
-			},
-			{
-				name:          "empty content",
-				content:       "",
-				fullLowercase: true,
-				expected:      "/**/",
-			},
-			{
-				name:          "all uppercase first word",
-				content:       "AI is artificial intelligence\nSecond line",
-				fullLowercase: false,
-				expected:      "/*AI is artificial intelligence\nSecond line*/",
-			},
-			{
-				name:          "all uppercase first word with punctuation",
-				content:       "CPU: high usage detected\nCheck system",
-				fullLowercase: false,
-				expected:      "/*CPU: high usage detected\nCheck system*/",
-			},
-		}
-
-		for _, tc := range tests {
-			t.Run(tc.name, func(t *testing.T) {
-				result := processMultiLineComment(tc.content, tc.fullLowercase)
-				assert.Equal(t, tc.expected, result)
-			})
-		}
-	})
 }
 
 // TestBackupFlagPropagation tests that the backup flag is properly passed from Options to ProcessRequest
@@ -1919,12 +1846,6 @@ func (ex *Remote) Close() error {
 		// verify inline comments are converted
 		assert.Contains(t, processedStr, "// inline comment that should be converted",
 			"Inline comment should be converted")
-
-		// verify multi-line comments are converted
-		assert.Contains(t, processedStr, "* this is a multi-line comment",
-			"Multi-line comment should be converted")
-		assert.Contains(t, processedStr, "* that should be converted",
-			"Multi-line comment should be converted")
 
 		// verify nested comments are converted
 		assert.Contains(t, processedStr, "// this is another nested comment",
