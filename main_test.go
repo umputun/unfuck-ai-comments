@@ -216,9 +216,9 @@ func TestConvertCommentToTitleCase(t *testing.T) {
 			expected: "/* this SHOULD\nBe Converted */",
 		},
 		{
-			name:     "uppercase first letter",
-			input:    "// UPPER case comment",
-			expected: "// uPPER case comment",
+			name:     "uppercase first letter with mixed case",
+			input:    "// UPPEr case comment",
+			expected: "// uPPEr case comment",
 		},
 		{
 			name:     "comment with special chars",
@@ -264,6 +264,37 @@ func TestConvertCommentToTitleCase(t *testing.T) {
 			name:     "TODO comment followed by space and word",
 			input:    "// TODO Fix this now",
 			expected: "// TODO Fix this now", // leave unchanged due to special indicator
+		},
+		// test cases for the new behavior to preserve all-uppercase words
+		{
+			name:     "all uppercase word",
+			input:    "// AI is an abbreviation",
+			expected: "// AI is an abbreviation", // should not change all-uppercase words
+		},
+		{
+			name:     "all uppercase word with special characters",
+			input:    "// AI: is an abbreviation",
+			expected: "// AI: is an abbreviation", // should not change all-uppercase words with punctuation
+		},
+		{
+			name:     "all uppercase multi-character word",
+			input:    "// CPU usage is high",
+			expected: "// CPU usage is high", // should not change all-uppercase words with multiple chars
+		},
+		{
+			name:     "single letter uppercase",
+			input:    "// A single letter",
+			expected: "// a single letter", // should still lowercase single letter words
+		},
+		{
+			name:     "mixed case word with uppercase start",
+			input:    "// APIclient should be converted",
+			expected: "// aPIclient should be converted", // should convert mixed case words
+		},
+		{
+			name:     "multiline with uppercase first word",
+			input:    "/* API documentation\nSecond line */",
+			expected: "/* API documentation\nSecond line */", // should not change all-uppercase words in multiline
 		},
 	}
 
@@ -1196,9 +1227,9 @@ func TestHelperFunctions(t *testing.T) {
 			},
 			{
 				name:          "title case conversion",
-				content:       " THIS Should BE Lowercase",
+				content:       " THIs Should BE Lowercase",
 				fullLowercase: false,
-				expected:      "// tHIS Should BE Lowercase",
+				expected:      "// tHIs Should BE Lowercase",
 			},
 			{
 				name:          "special indicator preserved in full lowercase",
@@ -1223,6 +1254,18 @@ func TestHelperFunctions(t *testing.T) {
 				content:       "   ",
 				fullLowercase: true,
 				expected:      "//   ",
+			},
+			{
+				name:          "all uppercase first word",
+				content:       " AI is artificial intelligence",
+				fullLowercase: false,
+				expected:      "// AI is artificial intelligence",
+			},
+			{
+				name:          "all uppercase first word with punctuation",
+				content:       " CPU: high usage detected",
+				fullLowercase: false,
+				expected:      "// CPU: high usage detected",
 			},
 		}
 
@@ -1249,9 +1292,9 @@ func TestHelperFunctions(t *testing.T) {
 			},
 			{
 				name:          "title case conversion",
-				content:       "THIS Should\nBE Lowercase",
+				content:       "THIs Should\nBE Lowercase",
 				fullLowercase: false,
-				expected:      "/*tHIS Should\nBE Lowercase*/",
+				expected:      "/*tHIs Should\nBE Lowercase*/",
 			},
 			{
 				name:          "special indicator preserved",
@@ -1264,6 +1307,18 @@ func TestHelperFunctions(t *testing.T) {
 				content:       "",
 				fullLowercase: true,
 				expected:      "/**/",
+			},
+			{
+				name:          "all uppercase first word",
+				content:       "AI is artificial intelligence\nSecond line",
+				fullLowercase: false,
+				expected:      "/*AI is artificial intelligence\nSecond line*/",
+			},
+			{
+				name:          "all uppercase first word with punctuation",
+				content:       "CPU: high usage detected\nCheck system",
+				fullLowercase: false,
+				expected:      "/*CPU: high usage detected\nCheck system*/",
 			},
 		}
 
