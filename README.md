@@ -210,7 +210,7 @@ The tool intelligently preserves camelCase and PascalCase identifiers in comment
 func Example() {
     // THIS USES someVariableName AND SomeImportantClass to demonstrate
     // becomes:
-    // this uses someVariableName AND SomeImportantClass to demonstrate
+    // this uses someVariableName and SomeImportantClass to demonstrate
 }
 ```
 
