@@ -171,7 +171,7 @@ type ProcessingResult struct {
 
 // determineProcessingMode figures out the processing mode and file patterns
 func determineProcessingMode(opts Options, p *flags.Parser) ProcessingResult {
-	// If dry run is enabled, return diff mode with run patterns
+	// if dry run is enabled, return diff mode with run patterns
 	if opts.DryRun {
 		return ProcessingResult{
 			Mode:     "diff",
@@ -179,7 +179,7 @@ func determineProcessingMode(opts Options, p *flags.Parser) ProcessingResult {
 		}
 	}
 
-	// Get processing mode and patterns based on active command
+	// get processing mode and patterns based on active command
 	if p.Command.Active != nil {
 		switch p.Command.Active.Name {
 		case "run":
@@ -200,7 +200,7 @@ func determineProcessingMode(opts Options, p *flags.Parser) ProcessingResult {
 		}
 	}
 
-	// Default to inplace mode
+	// default to inplace mode
 	return ProcessingResult{
 		Mode:     "inplace",
 		Patterns: nil,
@@ -313,7 +313,7 @@ func walkDir(dir string, req *ProcessRequest, writers OutputWriters) {
 		}
 
 		// skip vendor and testdata directories
-		if info.IsDir() && (info.Name() == "vendor" || strings.Contains(path, "/vendor/") || 
+		if info.IsDir() && (info.Name() == "vendor" || strings.Contains(path, "/vendor/") ||
 			info.Name() == "testdata" || strings.Contains(path, "/testdata/")) {
 			return filepath.SkipDir
 		}
