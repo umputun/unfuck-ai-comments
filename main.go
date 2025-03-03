@@ -492,7 +492,7 @@ func handleInplaceMode(fileName string, fset *token.FileSet, node *ast.File, for
 		fmt.Fprintf(writers.Stderr, "Error opening %s for writing: %v\n", fileName, err)
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	if err := printer.Fprint(file, fset, node); err != nil {
 		fmt.Fprintf(writers.Stderr, "Error writing to file %s: %v\n", fileName, err)

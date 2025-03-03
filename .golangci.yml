@@ -19,6 +19,52 @@ linters-settings:
       - wrapperFunc
       - hugeParam
       - rangeValCopy
+  errcheck:
+    # Report about not checking of errors in type assertions: `a := b.(MyStruct)`.
+    # Such cases aren't reported by default.
+    # Default: false
+    check-type-assertions: true
+    exclude-functions:
+      - "fmt.Fprintf"
+      - "fmt.Fprintln"
+      - "fmt.Fprint"
+  funlen:
+    # Checks the number of lines in a function.
+    # If lower than 0, disable the check.
+    # Default: 60
+    lines: 100
+    # Checks the number of statements in a function.
+    # If lower than 0, disable the check.
+    # Default: 40
+    statements: 50
+    # Ignore comments when counting lines.
+    # Default false
+    ignore-comments: true
+  cyclop:
+    # The maximal code complexity to report.
+    # Default: 10
+    max-complexity: 20
+    # The maximal average package complexity.
+    # If it's higher than 0.0 (float) the check is enabled
+    # Default: 0.0
+    package-average: 10.0
+  mnd:
+    # List of function patterns to exclude from analysis.
+    # Values always ignored: `time.Date`,
+    # `strconv.FormatInt`, `strconv.FormatUint`, `strconv.FormatFloat`,
+    # `strconv.ParseInt`, `strconv.ParseUint`, `strconv.ParseFloat`.
+    # Default: []
+    ignored-functions:
+      - args.Error
+      - flag.Arg
+      - flag.Duration.*
+      - flag.Float.*
+      - flag.Int.*
+      - flag.Uint.*
+      - os.Chmod
+      - os.Mkdir.*
+      - os.OpenFile
+      - os.WriteFile
 
 linters:
   disable-all: true
@@ -40,6 +86,19 @@ linters:
     - usetesting
     - testifylint
     - nonamedreturns
+    - errcheck
+    - funlen
+    - errname
+    - exptostd
+    - gocognit
+    - cyclop
+    - intrange
+    - iface
+    - mnd
+    - nestif
+    - nilerr
+    - predeclared
+    - unconvert
   fast: false
 
 run:
@@ -89,4 +148,14 @@ issues:
       path: _test\.go$
       linters:
         - errcheck
+    - path: "_test\\.go"
+      linters:
+        - bodyclose
+        - dupl
+        - errcheck
+        - funlen
+        - goconst
+        - gosec
+        - noctx
+        - wrapcheck
   exclude-use-default: false
