@@ -474,7 +474,7 @@ func processComments(node *ast.File, titleCase bool) (int, bool) {
 func getModifiedContent(fset *token.FileSet, node *ast.File) (string, error) {
 	var modifiedBuf strings.Builder
 	if err := printer.Fprint(&modifiedBuf, fset, node); err != nil {
-		return "", err
+		return "", fmt.Errorf("save modified buffer: %w", err)
 	}
 	return modifiedBuf.String(), nil
 }

@@ -99,6 +99,9 @@ linters:
     - nilerr
     - predeclared
     - unconvert
+    - wrapcheck
+    - goheader
+    - gci
   fast: false
 
 run:
