@@ -119,8 +119,10 @@ unfuck-ai-comments diff ./...
 ## Options
 
 - `--dry`:     Don't modify files, just show what would be changed (shortcut for diff command)
-- `--title`:   Convert only the first character to lowercase, keep the rest unchanged (deprecated, default now)
+- `--title`:   Convert only the first character to lowercase, keep the rest unchanged (default mode)
+  - In this mode, all-uppercase abbreviations and camelCase/PascalCase identifiers are preserved
 - `--full`:    Convert entire comment to lowercase, not just the first character
+  - In this mode, camelCase/PascalCase identifiers are still preserved
 - `--fmt`:     Format the output using "go fmt"
 - `--skip`:    Skip specified files or directories (can be used multiple times)
 - `--backup`:  Create .bak backup files for any files that are modified
@@ -164,7 +166,12 @@ unfuck-ai-comments run --backup ./...
 
 The tool uses Go's AST parser to identify comments that are inside functions or structs, while leaving package comments, function documentation, and other structural comments untouched.
 
-Comments inside function bodies and struct definitions are modified to be lowercase (or title case if the `--title` option is used).
+Comments inside function bodies and struct definitions are modified to be lowercase (or title case if the `--title` option is used). This includes:
+
+- Comments inside function bodies
+- Comments inside struct field definitions
+- Nested comments in control structures (if/for/switch)
+- Inline comments next to code
 
 ### Special Indicator Comments
 
@@ -192,5 +199,27 @@ func Example() {
     // TODO This comment will remain COMPLETELY unchanged
     // this regular comment will be converted to lowercase
     // FIXME: This will also remain untouched
+}
+```
+
+### Identifier Preservation
+
+The tool intelligently preserves camelCase and PascalCase identifiers in comments:
+
+```go
+func Example() {
+    // THIS USES someVariableName AND SomeImportantClass to demonstrate
+    // becomes:
+    // this uses someVariableName AND SomeImportantClass to demonstrate
+}
+```
+
+In title case mode (default), the tool also preserves all-uppercase abbreviations like "AI", "CPU", etc.
+
+```go
+func Example() {
+    // AI PROCESSING starts here
+    // becomes:
+    // AI processing starts here
 }
 ```
