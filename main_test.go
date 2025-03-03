@@ -606,17 +606,8 @@ func TestProcessPatternHandling(t *testing.T) {
 		require.NoError(t, err, "Failed to create test file: "+path)
 	}
 
-	// save current directory
-	currentDir, err := os.Getwd()
-	require.NoError(t, err)
-
 	// change to temp dir
-	err = os.Chdir(tempDir)
-	require.NoError(t, err)
-	defer func() {
-		err := os.Chdir(currentDir)
-		require.NoError(t, err, "Failed to restore original directory")
-	}()
+	t.Chdir(tempDir)
 
 	t.Run("specific file pattern", func(t *testing.T) {
 		// reset file
@@ -770,17 +761,8 @@ func Test(  ) {
 		require.NoError(t, err, "Failed to write test file")
 	}
 
-	// save current directory
-	currentDir, err := os.Getwd()
-	require.NoError(t, err)
-
 	// change to temp dir
-	err = os.Chdir(tempDir)
-	require.NoError(t, err)
-	defer func() {
-		err := os.Chdir(currentDir)
-		require.NoError(t, err, "Failed to restore original directory")
-	}()
+	t.Chdir(tempDir)
 
 	// process the files with format option
 	t.Run("recursive pattern with format", func(t *testing.T) {
@@ -883,17 +865,8 @@ func TestFunc() {
 	err := os.WriteFile(testFile, []byte(content), 0o600)
 	require.NoError(t, err, "Failed to write test file")
 
-	// save current directory
-	currentDir, err := os.Getwd()
-	require.NoError(t, err)
-
 	// change to temp dir to simulate CLI environment
-	err = os.Chdir(tempDir)
-	require.NoError(t, err)
-	defer func() {
-		err := os.Chdir(currentDir)
-		require.NoError(t, err, "Failed to restore original directory")
-	}()
+	t.Chdir(tempDir)
 
 	t.Run("inplace mode", func(t *testing.T) {
 		// reset test file
@@ -993,13 +966,11 @@ func TestMainFunctionMock(t *testing.T) {
 	require.NoError(t, err, "Failed to get working directory")
 
 	// change to temp dir
-	err = os.Chdir(tempDir)
-	require.NoError(t, err, "Failed to change to temp directory")
+	t.Chdir(tempDir)
 
 	// ensure we restore the working directory after the test
 	defer func() {
-		err := os.Chdir(currentDir)
-		require.NoError(t, err, "Failed to restore original working directory")
+		t.Chdir(currentDir)
 	}()
 
 	// create a test file with comments
@@ -1265,15 +1236,8 @@ func TestHelperFunctions(t *testing.T) {
 		err = os.WriteFile(nonGoFile, []byte("text file"), 0o600)
 		require.NoError(t, err)
 
-		// save current directory and change to temp dir
-		currentDir, err := os.Getwd()
-		require.NoError(t, err)
-		err = os.Chdir(tempDir)
-		require.NoError(t, err)
-		defer func() {
-			err := os.Chdir(currentDir)
-			require.NoError(t, err, "Failed to restore original directory")
-		}()
+		// change to temp dir
+		t.Chdir(tempDir)
 
 		// test with directory path
 		files := findGoFilesFromPattern(".")
@@ -1436,10 +1400,10 @@ func TestModeSelection(t *testing.T) {
 		}
 
 		p := flags.NewParser(&opts, flags.Default)
-		mode, patterns := determineProcessingMode(opts, p)
+		result := determineProcessingMode(opts, p)
 
-		assert.Equal(t, "diff", mode, "Dry run should set mode to diff")
-		assert.Equal(t, []string{"file.go"}, patterns, "Patterns should be properly passed")
+		assert.Equal(t, "diff", result.Mode, "Dry run should set mode to diff")
+		assert.Equal(t, []string{"file.go"}, result.Patterns, "Patterns should be properly passed")
 	})
 
 	t.Run("explicit modes via commands", func(t *testing.T) {
@@ -1470,11 +1434,11 @@ func TestModeSelection(t *testing.T) {
 					opts.Print.Args.Patterns = []string{"file.go"}
 				}
 
-				mode, patterns := determineProcessingMode(opts, p)
+				result := determineProcessingMode(opts, p)
 
-				assert.Equal(t, expectedMode, mode,
+				assert.Equal(t, expectedMode, result.Mode,
 					"Command '%s' should set mode to '%s'", cmdName, expectedMode)
-				assert.Equal(t, []string{"file.go"}, patterns,
+				assert.Equal(t, []string{"file.go"}, result.Patterns,
 					"Patterns should be properly passed")
 			})
 		}
@@ -1567,17 +1531,8 @@ func TestProcessPatternWithSkip(t *testing.T) {
 		require.NoError(t, err, "Failed to create test file: "+path)
 	}
 
-	// save current directory
-	currentDir, err := os.Getwd()
-	require.NoError(t, err)
-
 	// change to temp dir
-	err = os.Chdir(tempDir)
-	require.NoError(t, err)
-	defer func() {
-		err := os.Chdir(currentDir)
-		require.NoError(t, err, "Failed to restore original directory")
-	}()
+	t.Chdir(tempDir)
 
 	t.Run("skip specific file", func(t *testing.T) {
 		// reset files
@@ -1752,7 +1707,7 @@ func TestFunc() {
 
 		// verify backup file was not created
 		_, err = os.Stat(backupFile)
-		assert.Error(t, err, "Backup file should not exist")
+		require.Error(t, err, "Backup file should not exist")
 		assert.True(t, os.IsNotExist(err), "Error should be 'file does not exist'")
 	})
 }
@@ -1890,17 +1845,8 @@ func TestVendorAndTestdataExclusion(t *testing.T) {
 		require.NoError(t, err, "Failed to create test file: "+path)
 	}
 
-	// save current directory
-	currentDir, err := os.Getwd()
-	require.NoError(t, err)
-
 	// change to root dir
-	err = os.Chdir(rootDir)
-	require.NoError(t, err)
-	defer func() {
-		err := os.Chdir(currentDir)
-		require.NoError(t, err, "Failed to restore original directory")
-	}()
+	t.Chdir(rootDir)
 
 	// capture output using buffer writers
 	var stdoutBuf, stderrBuf bytes.Buffer
@@ -2106,7 +2052,7 @@ func TestParseCommandLineOptions(t *testing.T) {
 		_, _, err := parseCommandLineOptions(writers)
 
 		// verify version error was returned
-		assert.ErrorIs(t, err, ErrVersionRequested, "Should return version requested error")
+		require.ErrorIs(t, err, ErrVersionRequested, "Should return version requested error")
 
 		// verify version info was printed
 		assert.Contains(t, stdoutBuf.String(), "unfuck-ai-comments", "Version info should be printed")
@@ -2166,7 +2112,7 @@ func TestParseCommandLineOptions(t *testing.T) {
 		_, _, err := parseCommandLineOptions(writers)
 
 		// verify parsing failed error was returned
-		assert.ErrorIs(t, err, ErrParsingFailed, "Should return parsing failed error")
+		require.ErrorIs(t, err, ErrParsingFailed, "Should return parsing failed error")
 		assert.Contains(t, stderrBuf.String(), "Error:", "Should print error message")
 	})
 }

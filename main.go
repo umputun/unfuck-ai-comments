@@ -93,7 +93,9 @@ func main() {
 	}
 
 	// determine mode and file patterns to process
-	mode, args := determineProcessingMode(opts, p)
+	result := determineProcessingMode(opts, p)
+	mode := result.Mode
+	args := result.Patterns
 
 	// create process request with all options
 	req := ProcessRequest{
@@ -161,32 +163,48 @@ func showVersionInfo(w io.Writer) {
 	}
 }
 
+// ProcessingResult holds the result of determining the processing mode
+type ProcessingResult struct {
+	Mode     string
+	Patterns []string
+}
+
 // determineProcessingMode figures out the processing mode and file patterns
-func determineProcessingMode(opts Options, p *flags.Parser) (mode string, patterns []string) {
-	// default mode is inplace
-	mode = "inplace"
-
-	// override with dry-run if specified
+func determineProcessingMode(opts Options, p *flags.Parser) ProcessingResult {
+	// If dry run is enabled, return diff mode with run patterns
 	if opts.DryRun {
-		return "diff", opts.Run.Args.Patterns
-	}
-
-	// process according to command if specified
-	if p.Command.Active != nil {
-		switch p.Command.Active.Name {
-		case "run":
-			mode = "inplace"
-			patterns = opts.Run.Args.Patterns
-		case "diff":
-			mode = "diff"
-			patterns = opts.Diff.Args.Patterns
-		case "print":
-			mode = "print"
-			patterns = opts.Print.Args.Patterns
+		return ProcessingResult{
+			Mode:     "diff",
+			Patterns: opts.Run.Args.Patterns,
 		}
 	}
 
-	return mode, patterns
+	// Get processing mode and patterns based on active command
+	if p.Command.Active != nil {
+		switch p.Command.Active.Name {
+		case "run":
+			return ProcessingResult{
+				Mode:     "inplace",
+				Patterns: opts.Run.Args.Patterns,
+			}
+		case "diff":
+			return ProcessingResult{
+				Mode:     "diff",
+				Patterns: opts.Diff.Args.Patterns,
+			}
+		case "print":
+			return ProcessingResult{
+				Mode:     "print",
+				Patterns: opts.Print.Args.Patterns,
+			}
+		}
+	}
+
+	// Default to inplace mode
+	return ProcessingResult{
+		Mode:     "inplace",
+		Patterns: nil,
+	}
 }
 
 // patterns to process, defaulting to current directory

@@ -37,6 +37,9 @@ linters:
     - nakedret
     - gosimple
     - prealloc
+    - usetesting
+    - testifylint
+    - nonamedreturns
   fast: false
 
 run:
