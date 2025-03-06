@@ -63,4 +63,8 @@ func helperFunction() {
 	OtherVariable := "PascalCase"   // PascalCase should be preserved
 	_ = someVariableName
 	_ = OtherVariable
+	
+	// Testing technical linter directives
+	r := true //nolint:gosec // Using math/rand is ACCEPTABLE for tests
+	_ = r
 }

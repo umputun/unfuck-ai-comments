@@ -199,6 +199,11 @@ func TestConvertCommentToLowercase(t *testing.T) {
 			input:    "// Initialize someVariableName here",
 			expected: "// initialize someVariableName here",
 		},
+		{
+			name:     "technical linter comment with explanation",
+			input:    "//nolint:gosec // Using math/rand is acceptable for tests",
+			expected: "//nolint:gosec // using math/rand is acceptable for tests", // handle two-part comment correctly
+		},
 	}
 
 	for _, test := range tests {
@@ -337,6 +342,11 @@ func TestConvertCommentToTitleCase(t *testing.T) {
 			name:     "multiple camelCase and PascalCase identifiers",
 			input:    "// The someVariableName, OtherVariable, and anotherCamelCase example",
 			expected: "// the someVariableName, OtherVariable, and anotherCamelCase example", // preserve all identifiers
+		},
+		{
+			name:     "technical linter comment with explanation",
+			input:    "//nolint:gosec // Using math/rand is acceptable for tests",
+			expected: "//nolint:gosec // using math/rand is acceptable for tests", // should handle two-part comment correctly
 		},
 	}
 
@@ -1110,6 +1120,59 @@ func Test() {
 
 			// verify output
 			tc.verify(output)
+		})
+	}
+}
+
+// TestTechnicalComments tests the proper handling of technical comments with linter directives
+func TestTechnicalComments(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		titleCase bool
+		expected  string
+	}{
+		{
+			name:      "linter comment with explanation in title case mode",
+			input:     "//nolint:gosec // Using math/rand is ACCEPTABLE for tests",
+			titleCase: true,
+			expected:  "//nolint:gosec // using math/rand is ACCEPTABLE for tests",
+		},
+		{
+			name:      "linter comment with explanation in full lowercase mode",
+			input:     "//nolint:gosec // Using math/rand is ACCEPTABLE for tests",
+			titleCase: false,
+			expected:  "//nolint:gosec // using math/rand is acceptable for tests",
+		},
+		{
+			name:      "linter comment with different spacing",
+			input:     "//nolint:gosec  //   Using math/rand is ACCEPTABLE for tests",
+			titleCase: true,
+			expected:  "//nolint:gosec  //   using math/rand is ACCEPTABLE for tests",
+		},
+		{
+			name:      "linter comment with no space after directive",
+			input:     "//nolint// Using math/rand is ACCEPTABLE for tests",
+			titleCase: true,
+			expected:  "//nolint// using math/rand is ACCEPTABLE for tests",
+		},
+		{
+			name:      "linter comment without space between the markers",
+			input:     "//nolint:gosec//Using math/rand is ACCEPTABLE for tests",
+			titleCase: true,
+			expected:  "//nolint:gosec//using math/rand is ACCEPTABLE for tests",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var result string
+			if test.titleCase {
+				result = convertCommentToTitleCase(test.input)
+			} else {
+				result = convertCommentToLowercase(test.input)
+			}
+			assert.Equal(t, test.expected, result, "Comment conversion failed")
 		})
 	}
 }

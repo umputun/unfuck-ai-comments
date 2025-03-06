@@ -638,16 +638,33 @@ func processLineComment(content string, fullLowercase bool) string {
 		return "//" + content
 	}
 
-	// extract identifiers from the comment, which are words with pascal or camel case. we want to preserve them
-	identifiers := getCommentIdentifiers(content)
+	// Handle double comment format like "nolint:gosec // using math/rand is acceptable for tests"
+	// by finding the second "//" and processing each part appropriately
 
+	// try to find different formats of technical comments
+	for _, sep := range []string{" // ", "//", " //"} {
+		if idx := strings.Index(content, sep); idx >= 0 {
+			// for the first part (typically a directive like "nolint:gosec"), leave it unchanged
+			firstPart := content[:idx]
+			// process the second part (actual comment) according to the rules
+			secondPart := processCommentPart(content[idx+len(sep):], fullLowercase, getCommentIdentifiers(content[idx+len(sep):]))
+			return "//" + firstPart + sep + secondPart
+		}
+	}
+
+	// for normal comments, process the entire content
+	return "//" + processCommentPart(content, fullLowercase, getCommentIdentifiers(content))
+}
+
+// processCommentPart handles the processing of a single comment part
+func processCommentPart(content string, fullLowercase bool, identifiers []string) string {
 	if fullLowercase {
 		// convert entire comment to lowercase
 		res := strings.ToLower(content)
 		for _, id := range identifiers {
 			res = strings.ReplaceAll(res, strings.ToLower(id), id)
 		}
-		return "//" + res
+		return res
 	}
 
 	// for title case, convert only the first non-whitespace character
@@ -662,7 +679,7 @@ func processLineComment(content string, fullLowercase bool) string {
 	}
 
 	if remainingContent == "" {
-		return "//" + content
+		return content
 	}
 
 	// check if the first word is all uppercase (for abbreviations like AI, CPU)
@@ -683,22 +700,22 @@ func processLineComment(content string, fullLowercase bool) string {
 
 	// if first word is all uppercase and at least 2 characters, preserve it
 	if isAllUppercase && firstWordEnd >= 2 {
-		return "//" + content
+		return content
 	}
 
 	// check if the first word is in identifiers and preserve it
 	for _, id := range identifiers {
 		if strings.EqualFold(id, remainingContent[:firstWordEnd]) {
-			return "//" + content
+			return content
 		}
 	}
 
 	// otherwise convert first character to lowercase
 	firstChar := strings.ToLower(string(remainingContent[0]))
 	if len(remainingContent) > 1 {
-		return "//" + leadingWhitespace + firstChar + remainingContent[1:]
+		return leadingWhitespace + firstChar + remainingContent[1:]
 	}
-	return "//" + leadingWhitespace + firstChar
+	return leadingWhitespace + firstChar
 }
 
 // getCommentIdentifiers extracts identifiers from a comment
