@@ -80,7 +80,26 @@ func ComplexFunc() {
 	func() {
 		// Comment inside closure SHOULD be modified
 	}()
-}`
+}
+
+// Comment before var block should NOT be modified
+var (
+	// Comment inside var block SHOULD be modified
+	VarX = 1
+	
+	// Another var comment SHOULD be modified
+	VarY = 2
+)
+
+// Comment before const block should NOT be modified
+const (
+	// Comment inside const block SHOULD be modified
+	ConstX = 1
+	
+	// Another const comment SHOULD be modified
+	ConstY = 2
+)
+`
 
 	// write the test file
 	err := os.WriteFile(testFilePath, []byte(src), 0o600)
@@ -1208,11 +1227,13 @@ func TestSampleGo(t *testing.T) {
 		Stderr: &stderrBuf,
 	}
 
-	// process with title case mode (preserves camelCase and PascalCase)
-	processFile(tempFile, "print", true, false, writers)
+	// process in inplace mode first with FULL lowercase mode (not title case)
+	processFile(tempFile, "inplace", false, false, writers)
 
-	// get the processed content
-	processedContent := stdoutBuf.String()
+	// then read the processed file directly
+	modifiedContent, err := os.ReadFile(tempFile)
+	require.NoError(t, err, "Failed to read modified file")
+	processedContent := string(modifiedContent)
 
 	// check for camelCase and PascalCase preservation
 	assert.Contains(t, processedContent, "camelCase should be preserved",
@@ -1231,6 +1252,28 @@ func TestSampleGo(t *testing.T) {
 	// verify specific comment that demonstrates both lowercase conversion and identifier preservation
 	assert.Contains(t, processedContent, "// example with camelCase and PascalCase identifiers",
 		"First word should be lowercase while identifiers preserved")
+
+	// verify comments inside var blocks are converted
+	assert.Contains(t, processedContent, "// this comment should be converted",
+		"Comment inside var block should be converted")
+	assert.Contains(t, processedContent, "// inline comment should be converted",
+		"Inline comment inside var block should be converted")
+	assert.Contains(t, processedContent, "// another comment to process",
+		"Another comment inside var block should be converted")
+	assert.Contains(t, processedContent, "// another inline comment to process",
+		"Another inline comment inside var block should be converted")
+
+	// verify comments inside const blocks are converted
+	assert.Contains(t, processedContent, "// this comment should be converted",
+		"Comment inside const block should be converted")
+	assert.Contains(t, processedContent, "// inline comment should be converted",
+		"Inline comment inside const block should be converted")
+
+	// verify comments inside local var/const blocks are converted
+	assert.Contains(t, processedContent, "// this should be converted",
+		"Comment inside local var block should be converted")
+	assert.Contains(t, processedContent, "// another local comment",
+		"Comment inside local blocks should be converted")
 }
 
 // TestHelperFunctions tests the helper functions for pattern processing
@@ -1949,6 +1992,217 @@ func TestVendorAndTestdataExclusion(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(content), "// THIS TESTDATA COMMENT",
 		"Testdata directory file should NOT be processed")
+}
+
+// TestVarConstBlocks tests the handling of comments inside var and const blocks
+func TestVarConstBlocks(t *testing.T) {
+	t.Run("Full lowercase mode", func(t *testing.T) {
+		// create a temporary directory for tests
+		tempDir := t.TempDir()
+		testFile := filepath.Join(tempDir, "var_const_full.go")
+
+		// create test file content with var and const blocks
+		content := `package test
+
+// Package level variable declaration should NOT be modified
+var SingleVar = "test"
+
+// Package level const declaration should NOT be modified
+const SingleConst = "test"
+
+// This comment before var block should NOT be modified
+var (
+	// THIS Comment SHOULD be modified (inside var block)
+	VarInBlock1 = "test1"
+	
+	// ANOTHER Comment to PROCESS
+	VarInBlock2 = "test2"
+)
+
+// This comment before const block should NOT be modified
+const (
+	// THIS Comment SHOULD be modified (inside const block)
+	ConstInBlock1 = "test1"
+	
+	// ANOTHER Comment to PROCESS
+	ConstInBlock2 = "test2"
+)
+
+func Example() {
+	// This comment inside function should be modified
+	
+	// These comments should all be modified (inside function)
+	var (
+		// THIS Comment SHOULD be modified (inside function and var block)
+		localVar1 = "local1"
+		
+		// ANOTHER Local Comment
+		localVar2 = "local2"
+	)
+	
+	// This comment should be modified (inside function)
+	const (
+		// THIS Comment SHOULD be modified (inside function and const block)
+		localConst1 = "local1"
+		
+		// ANOTHER Local Comment
+		localConst2 = "local2"
+	)
+	
+	_ = localVar1
+	_ = localVar2
+	_ = localConst1
+	_ = localConst2
+}`
+
+		// write the test file
+		err := os.WriteFile(testFile, []byte(content), 0o600)
+		require.NoError(t, err, "Failed to write test file")
+
+		// capture output using buffer writers
+		var stdoutBuf, stderrBuf bytes.Buffer
+		writers := OutputWriters{
+			Stdout: &stdoutBuf,
+			Stderr: &stderrBuf,
+		}
+
+		// process file with full lowercase mode
+		processFile(testFile, "inplace", false, false, writers)
+
+		// read the processed file
+		processedContent, err := os.ReadFile(testFile)
+		require.NoError(t, err, "Failed to read processed file")
+		processedStr := string(processedContent)
+
+		// verify package-level comments outside blocks are not modified
+		assert.Contains(t, processedStr, "// Package level variable declaration should NOT be modified",
+			"Package level comment should not be modified")
+		assert.Contains(t, processedStr, "// Package level const declaration should NOT be modified",
+			"Package level comment should not be modified")
+		assert.Contains(t, processedStr, "// This comment before var block should NOT be modified",
+			"Comment before var block should not be modified")
+		assert.Contains(t, processedStr, "// This comment before const block should NOT be modified",
+			"Comment before const block should not be modified")
+
+		// verify comments inside var blocks are modified (full lowercase)
+		assert.Contains(t, processedStr, "// this comment should be modified (inside var block)",
+			"Comment inside var block should be modified")
+		assert.Contains(t, processedStr, "// another comment to process",
+			"Comment inside var block should be modified")
+
+		// verify comments inside const blocks are modified (full lowercase)
+		assert.Contains(t, processedStr, "// this comment should be modified (inside const block)",
+			"Comment inside const block should be modified")
+		assert.Contains(t, processedStr, "// another comment to process",
+			"Comment inside const block should be modified")
+
+		// verify comments inside local var/const blocks are modified (full lowercase)
+		assert.Contains(t, processedStr, "// this comment should be modified (inside function and var block)",
+			"Comment inside local var block should be modified")
+		assert.Contains(t, processedStr, "// this comment should be modified (inside function and const block)",
+			"Comment inside local const block should be modified")
+		assert.Contains(t, processedStr, "// another local comment",
+			"Comment inside local blocks should be modified")
+	})
+
+	// test both title case and full lowercase modes
+	t.Run("Both modes with var/const blocks", func(t *testing.T) {
+		// 1. First test with full lowercase mode
+
+		// create test file with var/const blocks
+		fullDir := t.TempDir()
+		fullFile := filepath.Join(fullDir, "full_lowercase.go")
+
+		fullContent := `package test
+
+var (
+	// UPPERCASE COMMENT to test
+	x = 1
+)
+
+const (
+	// ANOTHER UPPERCASE COMMENT
+	y = 2
+)
+
+func Example() {
+	var (
+		// FUNCTION VAR COMMENT
+		z = 3
+	)
+}`
+
+		// write the test file
+		err := os.WriteFile(fullFile, []byte(fullContent), 0o600)
+		require.NoError(t, err, "Failed to write test file")
+
+		// process with FULL lowercase mode
+		var fullStdout, fullStderr bytes.Buffer
+		fullWriters := OutputWriters{
+			Stdout: &fullStdout,
+			Stderr: &fullStderr,
+		}
+		processFile(fullFile, "inplace", false, false, fullWriters)
+
+		// read the result
+		fullResult, err := os.ReadFile(fullFile)
+		require.NoError(t, err, "Failed to read result file")
+		fullStr := string(fullResult)
+
+		// in full lowercase mode, comments are fully converted to lowercase
+		assert.Contains(t, fullStr, "// uppercase comment", "Comment in var block should be converted to lowercase")
+		assert.Contains(t, fullStr, "// another uppercase", "Comment in const block should be converted to lowercase")
+		assert.Contains(t, fullStr, "// function var", "Comment in function var block should be converted to lowercase")
+
+		// 2. Now test with title case mode
+
+		// create test file with var/const blocks
+		titleDir := t.TempDir()
+		titleFile := filepath.Join(titleDir, "title_case.go")
+
+		titleContent := `package test
+
+var (
+	// First COMMENT to test
+	x = 1
+)
+
+const (
+	// Second UPPERCASE COMMENT
+	y = 2
+)
+
+func Example() {
+	var (
+		// Third COMMENT in function
+		z = 3
+	)
+}`
+
+		// write the test file
+		err = os.WriteFile(titleFile, []byte(titleContent), 0o600)
+		require.NoError(t, err, "Failed to write test file")
+
+		// process with title case mode
+		var titleStdout, titleStderr bytes.Buffer
+		titleWriters := OutputWriters{
+			Stdout: &titleStdout,
+			Stderr: &titleStderr,
+		}
+		processFile(titleFile, "inplace", true, false, titleWriters)
+
+		// read the result
+		titleResult, err := os.ReadFile(titleFile)
+		require.NoError(t, err, "Failed to read result file")
+		titleStr := string(titleResult)
+
+		// both modes work correctly with var/const blocks
+
+		// for title case, only first letter should be lowercase
+		assert.Contains(t, titleStr, "// first", "Comment in var block should have first letter lowercase")
+		assert.Contains(t, titleStr, "// second", "Comment in const block should have first letter lowercase")
+		assert.Contains(t, titleStr, "// third", "Comment in function var block should have first letter lowercase")
+	})
 }
 
 // TestWithSampleFile tests the tool against a sample file

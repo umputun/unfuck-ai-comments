@@ -52,6 +52,30 @@ type sshClient struct {
 
 // Comment between types should NOT be converted
 
+// Package-level var should NOT be converted
+var singleVar = "test"
+
+// This comment should NOT be converted (outside block)
+var (
+	// THIS Comment SHOULD be converted (inside var block)
+	debugEnabled bool = false // INLINE Comment SHOULD be converted (inside var block)
+
+	// ANOTHER Comment to PROCESS
+	configPath string = "/etc/config.json" // ANOTHER Inline COMMENT to process
+)
+
+// Package-level const should NOT be converted
+const singleConst = 42
+
+// This comment should NOT be converted (outside block)
+const (
+	// THIS Comment SHOULD be converted (inside const block)
+	statusOK int = 200 // INLINE Comment SHOULD be converted (inside const block)
+
+	// ANOTHER Comment to PROCESS
+	maxRetries int = 3 // ANOTHER Inline COMMENT to process
+)
+
 // Helper function demonstrates another function.
 func helperFunction() {
 	// ALL CAPS COMMENT should be converted
@@ -67,4 +91,26 @@ func helperFunction() {
 	// Testing technical linter directives
 	r := true //nolint:gosec // Using math/rand is ACCEPTABLE for tests
 	_ = r
+	
+	// Local vars and consts inside functions
+	var (
+		// THIS SHOULD be converted (inside function & var block)
+		localVar string = "test"
+		
+		// ANOTHER Local Comment
+		count int = 0
+	)
+	
+	const (
+		// THIS SHOULD be converted (inside function & const block)
+		localConst float64 = 3.14
+		
+		// ANOTHER Local Comment
+		maxCount int = 100
+	)
+	
+	_ = localVar
+	_ = count
+	_ = localConst
+	_ = maxCount
 }

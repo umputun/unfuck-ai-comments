@@ -581,11 +581,12 @@ func handleDiffMode(fileName string, fset *token.FileSet, node *ast.File, format
 	fmt.Fprint(writers.Stdout, simpleDiff(originalContent, modifiedContent))
 }
 
-// isCommentInsideFunctionOrStruct checks if a comment is inside a function declaration or a struct declaration
+// isCommentInsideFunctionOrStruct checks if a comment is inside a function declaration, struct declaration,
+// var block, or const block
 func isCommentInsideFunctionOrStruct(file *ast.File, comment *ast.Comment) bool {
 	commentPos := comment.Pos()
 
-	// find if comment is inside a function or struct
+	// find if comment is inside a function, struct, var block, or const block
 	var insideNode bool
 	ast.Inspect(file, func(n ast.Node) bool {
 		if n == nil {
@@ -604,6 +605,18 @@ func isCommentInsideFunctionOrStruct(file *ast.File, comment *ast.Comment) bool 
 			if node.Fields != nil && node.Fields.Opening <= commentPos && commentPos <= node.Fields.Closing {
 				insideNode = true
 				return false // stop traversal
+			}
+		case *ast.GenDecl:
+			// handle variable and constant declarations in blocks
+			if node.Tok == token.VAR || node.Tok == token.CONST {
+				// check if it's a block declaration (with braces)
+				if node.Lparen != token.NoPos && node.Rparen != token.NoPos {
+					// check if comment is inside the block (between braces)
+					if node.Lparen <= commentPos && commentPos <= node.Rparen {
+						insideNode = true
+						return false // stop traversal
+					}
+				}
 			}
 		}
 		return true
