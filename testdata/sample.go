@@ -62,6 +62,13 @@ var (
 
 	// ANOTHER Comment to PROCESS
 	configPath string = "/etc/config.json" // ANOTHER Inline COMMENT to process
+	
+	// DocumentedVar is a variable with documentation - this comment should NOT be converted
+	// because it follows the "VarName is..." pattern
+	DocumentedVar string = "documented"
+	
+	// This comment doesn't follow the naming pattern and SHOULD be converted
+	UndocumentedVar string = "undocumented"
 )
 
 // Package-level const should NOT be converted
@@ -74,6 +81,13 @@ const (
 
 	// ANOTHER Comment to PROCESS
 	maxRetries int = 3 // ANOTHER Inline COMMENT to process
+	
+	// DocumentedConst is a documented constant - this comment should NOT be converted
+	// because it follows the "ConstName is..." pattern
+	DocumentedConst int = 400
+	
+	// This comment doesn't follow the naming pattern and SHOULD be converted
+	UndocumentedConst int = 500
 )
 
 // Helper function demonstrates another function.
