@@ -1263,11 +1263,27 @@ func TestSampleGo(t *testing.T) {
 	assert.Contains(t, processedContent, "// another inline comment to process",
 		"Another inline comment inside var block should be converted")
 
+	// verify documentation comments for variables are preserved
+	assert.Contains(t, processedContent, "// DocumentedVar is a variable with documentation",
+		"Documentation comment for variables following the VarName pattern should be preserved")
+
+	// verify regular comments for variables are converted
+	assert.Contains(t, processedContent, "// this comment doesn't follow the naming pattern",
+		"Regular comments for variables should be converted")
+
 	// verify comments inside const blocks are converted
 	assert.Contains(t, processedContent, "// this comment should be converted",
 		"Comment inside const block should be converted")
 	assert.Contains(t, processedContent, "// inline comment should be converted",
 		"Inline comment inside const block should be converted")
+
+	// verify documentation comments for constants are preserved
+	assert.Contains(t, processedContent, "// DocumentedConst is a documented constant",
+		"Documentation comment for constants following the ConstName pattern should be preserved")
+
+	// verify regular comments for constants are converted
+	assert.Contains(t, processedContent, "// this comment doesn't follow the naming pattern",
+		"Regular comments for constants should be converted")
 
 	// verify comments inside local var/const blocks are converted
 	assert.Contains(t, processedContent, "// this should be converted",
@@ -1444,6 +1460,210 @@ func TestHelperFunctions(t *testing.T) {
 				assert.Equal(t, tc.expected, result)
 			})
 		}
+	})
+}
+
+// TestDocConstAndVarComments tests that documentation comments for both const and var declarations
+// keep their original case while other comments inside const/var blocks are properly converted
+func TestDocConstAndVarComments(t *testing.T) {
+	t.Run("Title case mode for constants", func(t *testing.T) {
+		// create a temporary file with const declarations and documentation comments
+		tempDir := t.TempDir()
+		testFile := filepath.Join(tempDir, "const_comments_test.go")
+
+		content := `package test
+
+const SingleConst = 42 // inline comment
+
+// This comment should NOT be converted
+const ExportedConst = 123
+
+const (
+	// InternalConst is a documented constant
+	// This comment should NOT be changed
+	InternalConst = 456
+
+	// This is a regular comment
+	// and should be converted
+	RegularConst = 789 // inline comment SHOULD be converted
+)`
+
+		err := os.WriteFile(testFile, []byte(content), 0o600)
+		require.NoError(t, err, "Failed to write test file")
+
+		// process the file with title case mode
+		var stdoutBuf, stderrBuf bytes.Buffer
+		writers := OutputWriters{
+			Stdout: &stdoutBuf,
+			Stderr: &stderrBuf,
+		}
+
+		processFile(testFile, "inplace", true, false, writers)
+
+		// read the processed file
+		modifiedContent, err := os.ReadFile(testFile)
+		require.NoError(t, err, "Failed to read modified file")
+		processedContent := string(modifiedContent)
+
+		// documentation comments should remain unchanged
+		assert.Contains(t, processedContent, "// InternalConst is a documented constant",
+			"Documentation comment for a constant should remain unchanged")
+
+		// regular comments inside const blocks should be converted
+		assert.Contains(t, processedContent, "// this is a regular comment",
+			"Regular comment inside const block should be converted")
+		assert.Contains(t, processedContent, "// and should be converted",
+			"Regular comment continuation should be converted")
+	})
+
+	t.Run("Title case mode for variables", func(t *testing.T) {
+		// create a temporary file with var declarations and documentation comments
+		tempDir := t.TempDir()
+		testFile := filepath.Join(tempDir, "var_comments_test.go")
+
+		content := `package test
+
+var SingleVar = "value" // inline comment
+
+// This comment should NOT be converted
+var ExportedVar = "exported"
+
+var (
+	// InternalVar is a documented variable
+	// This comment should NOT be changed
+	InternalVar = "internal"
+
+	// This is a regular comment
+	// and should be converted
+	RegularVar = "regular" // inline comment SHOULD be converted
+)`
+
+		err := os.WriteFile(testFile, []byte(content), 0o600)
+		require.NoError(t, err, "Failed to write test file")
+
+		// process the file with title case mode
+		var stdoutBuf, stderrBuf bytes.Buffer
+		writers := OutputWriters{
+			Stdout: &stdoutBuf,
+			Stderr: &stderrBuf,
+		}
+
+		processFile(testFile, "inplace", true, false, writers)
+
+		// read the processed file
+		modifiedContent, err := os.ReadFile(testFile)
+		require.NoError(t, err, "Failed to read modified file")
+		processedContent := string(modifiedContent)
+
+		// documentation comments should remain unchanged
+		assert.Contains(t, processedContent, "// InternalVar is a documented variable",
+			"Documentation comment for a variable should remain unchanged")
+
+		// regular comments inside var blocks should be converted
+		assert.Contains(t, processedContent, "// this is a regular comment",
+			"Regular comment inside var block should be converted")
+		assert.Contains(t, processedContent, "// and should be converted",
+			"Regular comment continuation should be converted")
+	})
+
+	t.Run("Full lowercase mode for constants", func(t *testing.T) {
+		// create a temporary file with const declarations and documentation comments
+		tempDir := t.TempDir()
+		testFile := filepath.Join(tempDir, "const_comments_test_full.go")
+
+		content := `package test
+
+const SingleConst = 42 // INLINE Comment
+
+// This comment should NOT be converted
+const ExportedConst = 123
+
+const (
+	// MyConst is a documented constant
+	// This comment should NOT be changed
+	MyConst = 456
+
+	// This IS A Regular Comment
+	// AND Should BE Converted
+	RegularConst = 789 // INLINE Comment SHOULD Be Converted
+)`
+
+		err := os.WriteFile(testFile, []byte(content), 0o600)
+		require.NoError(t, err, "Failed to write test file")
+
+		// process the file with FULL lowercase mode
+		var stdoutBuf, stderrBuf bytes.Buffer
+		writers := OutputWriters{
+			Stdout: &stdoutBuf,
+			Stderr: &stderrBuf,
+		}
+
+		processFile(testFile, "inplace", false, false, writers)
+
+		// read the processed file
+		modifiedContent, err := os.ReadFile(testFile)
+		require.NoError(t, err, "Failed to read modified file")
+		processedContent := string(modifiedContent)
+
+		// check that documentation comments for constants remain unchanged
+		assert.Contains(t, processedContent, "// MyConst is a documented constant",
+			"Documentation comment for a constant should remain unchanged in full mode")
+
+		// check that regular comments inside const blocks are converted
+		assert.Contains(t, processedContent, "// this is a regular comment",
+			"Regular comment inside const block should be fully lowercase in full mode")
+		assert.Contains(t, processedContent, "// and should be converted",
+			"Regular comment continuation should be fully lowercase in full mode")
+	})
+
+	t.Run("Full lowercase mode for variables", func(t *testing.T) {
+		// create a temporary file with var declarations and documentation comments
+		tempDir := t.TempDir()
+		testFile := filepath.Join(tempDir, "var_comments_test_full.go")
+
+		content := `package test
+
+var SingleVar = "value" // INLINE Comment
+
+// This comment should NOT be converted
+var ExportedVar = "exported"
+
+var (
+	// MyVar is a documented variable
+	// This comment should NOT be changed
+	MyVar = "documented"
+
+	// This IS A Regular Comment
+	// AND Should BE Converted
+	RegularVar = "regular" // INLINE Comment SHOULD Be Converted
+)`
+
+		err := os.WriteFile(testFile, []byte(content), 0o600)
+		require.NoError(t, err, "Failed to write test file")
+
+		// process the file with FULL lowercase mode
+		var stdoutBuf, stderrBuf bytes.Buffer
+		writers := OutputWriters{
+			Stdout: &stdoutBuf,
+			Stderr: &stderrBuf,
+		}
+
+		processFile(testFile, "inplace", false, false, writers)
+
+		// read the processed file
+		modifiedContent, err := os.ReadFile(testFile)
+		require.NoError(t, err, "Failed to read modified file")
+		processedContent := string(modifiedContent)
+
+		// check that documentation comments for variables remain unchanged
+		assert.Contains(t, processedContent, "// MyVar is a documented variable",
+			"Documentation comment for a variable should remain unchanged in full mode")
+
+		// check that regular comments inside var blocks are converted
+		assert.Contains(t, processedContent, "// this is a regular comment",
+			"Regular comment inside var block should be fully lowercase in full mode")
+		assert.Contains(t, processedContent, "// and should be converted",
+			"Regular comment continuation should be fully lowercase in full mode")
 	})
 }
 

@@ -449,7 +449,12 @@ func processComments(node *ast.File, titleCase bool) (int, bool) {
 
 	for _, commentGroup := range node.Comments {
 		for _, comment := range commentGroup.List {
-			// check if comment is inside a function
+			// skip documentation comments that follow the Go standard "IdentifierName is..." pattern
+			if isIdentifierDocComment(comment, node) {
+				continue
+			}
+
+			// check if comment is inside a function, struct, or const/var block
 			if isCommentInsideFunctionOrStruct(node, comment) {
 				// process the comment text
 				orig := comment.Text
@@ -468,6 +473,32 @@ func processComments(node *ast.File, titleCase bool) (int, bool) {
 		}
 	}
 	return changeCount, modified
+}
+
+// isIdentifierDocComment checks if a comment is a Go documentation comment
+// that follows the standard "IdentifierName is..." pattern typically used for documenting
+// constants, variables, functions, and types
+func isIdentifierDocComment(comment *ast.Comment, file *ast.File) bool {
+	commentText := strings.TrimSpace(strings.TrimPrefix(comment.Text, "//"))
+
+	// check for both const and var declarations
+	for _, decl := range file.Decls {
+		if genDecl, ok := decl.(*ast.GenDecl); ok && (genDecl.Tok == token.CONST || genDecl.Tok == token.VAR) {
+			// check each specification
+			for _, spec := range genDecl.Specs {
+				if valueSpec, ok := spec.(*ast.ValueSpec); ok && len(valueSpec.Names) > 0 {
+					// check if comment follows the pattern "IdentName is..."
+					for _, name := range valueSpec.Names {
+						if strings.HasPrefix(commentText, name.Name+" ") {
+							return true
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 // getModifiedContent generates the modified content as a string
