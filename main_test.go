@@ -2181,7 +2181,7 @@ func TestVendorAndTestdataExclusion(t *testing.T) {
 		Stderr: &stderrBuf,
 	}
 
-	// process recursively (which should automatically skip vendor and testdata)
+	// test case 1: recursive pattern (./...)
 	req := ProcessRequest{
 		OutputMode:   "inplace",
 		TitleCase:    false,
@@ -2212,6 +2212,32 @@ func TestVendorAndTestdataExclusion(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(content), "// THIS TESTDATA COMMENT",
 		"Testdata directory file should NOT be processed")
+
+	// test case 2: non-recursive pattern with vendor file
+	// reset the files to uppercase
+	for path, content := range files {
+		err := os.WriteFile(path, []byte(content), 0o600)
+		require.NoError(t, err, "Failed to reset test file: "+path)
+	}
+
+	// process vendor file directly
+	processPattern(filepath.Join("vendor", "vendor.go"), &req, writers)
+
+	// verify vendor file was NOT processed
+	content, err = os.ReadFile(filepath.Join("vendor", "vendor.go"))
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "// THIS VENDOR COMMENT",
+		"Vendor file should NOT be processed when specified directly")
+
+	// test case 3: non-recursive pattern with testdata file
+	// process testdata file directly
+	processPattern(filepath.Join("testdata", "testdata.go"), &req, writers)
+
+	// verify testdata file was NOT processed
+	content, err = os.ReadFile(filepath.Join("testdata", "testdata.go"))
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "// THIS TESTDATA COMMENT",
+		"Testdata file should NOT be processed when specified directly")
 }
 
 // TestVarConstBlocks tests the handling of comments inside var and const blocks

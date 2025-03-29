@@ -232,6 +232,16 @@ type ProcessRequest struct {
 
 // processPattern processes a single pattern
 func processPattern(pattern string, req *ProcessRequest, writers OutputWriters) {
+	// skip vendor and testdata directories
+	normalizedPath := filepath.Clean(pattern)
+	if strings.Contains(normalizedPath, string(filepath.Separator)+"vendor"+string(filepath.Separator)) ||
+		strings.Contains(normalizedPath, string(filepath.Separator)+"testdata"+string(filepath.Separator)) ||
+		normalizedPath == "vendor" || normalizedPath == "testdata" ||
+		strings.HasPrefix(normalizedPath, "vendor"+string(filepath.Separator)) ||
+		strings.HasPrefix(normalizedPath, "testdata"+string(filepath.Separator)) {
+		return
+	}
+
 	// handle recursive pattern cases
 	if isRecursivePattern(pattern) {
 		dir := extractDirectoryFromPattern(pattern)
