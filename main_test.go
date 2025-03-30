@@ -1799,6 +1799,19 @@ func TestIsGeneratedFile(t *testing.T) {
 		assert.False(t, isGenerated, "Should not identify normal file as generated")
 	})
 
+	t.Run("handles empty file", func(t *testing.T) {
+		// create an empty file
+		tempDir := t.TempDir()
+		emptyFile := filepath.Join(tempDir, "empty.go")
+		err := os.WriteFile(emptyFile, []byte(""), 0o600)
+		require.NoError(t, err, "Failed to create empty test file")
+
+		// test detection
+		isGenerated, err := isGeneratedFile(emptyFile)
+		require.NoError(t, err, "Should not error on empty file")
+		assert.False(t, isGenerated, "Empty file should not be identified as generated")
+	})
+
 	t.Run("handles nonexistent file", func(t *testing.T) {
 		// test with nonexistent file
 		_, err := isGeneratedFile("/nonexistent/path/file.go")

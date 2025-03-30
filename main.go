@@ -430,7 +430,10 @@ func isGeneratedFile(fileName string) (bool, error) {
 		firstLine := scanner.Text()
 		return strings.HasPrefix(firstLine, "// Code generated"), nil
 	}
-	return false, fmt.Errorf("scan file %s: %w", fileName, scanner.Err())
+	if err := scanner.Err(); err != nil {
+		return false, fmt.Errorf("scan file %s: %w", fileName, err)
+	}
+	return false, nil // empty file is not generated
 }
 
 // processFile processes a file using custom writers
