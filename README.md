@@ -166,6 +166,8 @@ unfuck-ai-comments run --backup ./...
 
 The tool uses Go's AST parser to identify comments that are inside functions or structs, while leaving package comments, function documentation, and other structural comments untouched.
 
+The tool automatically skips generated files that start with the standard Go comment marker `// Code generated`. These files are typically produced by tools like `go generate` and should not be modified.
+
 Comments inside function bodies and struct definitions are modified to be lowercase (or title case if the `--title` option is used). This includes:
 
 - Comments inside function bodies

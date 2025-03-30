@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"go/ast"
@@ -416,8 +417,34 @@ func formatWithGofmt(content string) string {
 	return string(formattedBytes)
 }
 
+// isGeneratedFile checks if a file is a generated file by examining the first line
+func isGeneratedFile(fileName string) (bool, error) {
+	file, err := os.Open(fileName) //nolint:gosec // we need to open the file to check if it's generated
+	if err != nil {
+		return false, fmt.Errorf("open file %s: %w", fileName, err)
+	}
+	defer func() { _ = file.Close() }()
+
+	scanner := bufio.NewScanner(file)
+	if scanner.Scan() {
+		firstLine := scanner.Text()
+		return strings.HasPrefix(firstLine, "// Code generated"), nil
+	}
+	return false, fmt.Errorf("scan file %s: %w", fileName, scanner.Err())
+}
+
 // processFile processes a file using custom writers
 func processFile(fileName, outputMode string, titleCase, format bool, writers OutputWriters, backup ...bool) int {
+	// check if file is generated
+	isGenerated, err := isGeneratedFile(fileName)
+	if err != nil {
+		fmt.Fprintf(writers.Stderr, "Error checking if file is generated %s: %v\n", fileName, err)
+		return 0
+	}
+	if isGenerated {
+		return 0 // skip generated files
+	}
+
 	// parse the file
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, fileName, nil, parser.ParseComments)
