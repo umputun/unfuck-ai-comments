@@ -1,164 +1,149 @@
-linters-settings:
-  gocyclo:
-    min-complexity: 15
-  dupl:
-    threshold: 100
-  goconst:
-    min-len: 2
-    min-occurrences: 2
-  misspell:
-    locale: US
-  lll:
-    line-length: 140
-  gocritic:
-    enabled-tags:
-      - performance
-      - style
-      - experimental
-    disabled-checks:
-      - wrapperFunc
-      - hugeParam
-      - rangeValCopy
-  errcheck:
-    # Report about not checking of errors in type assertions: `a := b.(MyStruct)`.
-    # Such cases aren't reported by default.
-    # Default: false
-    check-type-assertions: true
-    exclude-functions:
-      - "fmt.Fprintf"
-      - "fmt.Fprintln"
-      - "fmt.Fprint"
-  funlen:
-    # Checks the number of lines in a function.
-    # If lower than 0, disable the check.
-    # Default: 60
-    lines: 100
-    # Checks the number of statements in a function.
-    # If lower than 0, disable the check.
-    # Default: 40
-    statements: 50
-    # Ignore comments when counting lines.
-    # Default false
-    ignore-comments: true
-  cyclop:
-    # The maximal code complexity to report.
-    # Default: 10
-    max-complexity: 20
-    # The maximal average package complexity.
-    # If it's higher than 0.0 (float) the check is enabled
-    # Default: 0.0
-    package-average: 10.0
-  mnd:
-    # List of function patterns to exclude from analysis.
-    # Values always ignored: `time.Date`,
-    # `strconv.FormatInt`, `strconv.FormatUint`, `strconv.FormatFloat`,
-    # `strconv.ParseInt`, `strconv.ParseUint`, `strconv.ParseFloat`.
-    # Default: []
-    ignored-functions:
-      - args.Error
-      - flag.Arg
-      - flag.Duration.*
-      - flag.Float.*
-      - flag.Int.*
-      - flag.Uint.*
-      - os.Chmod
-      - os.Mkdir.*
-      - os.OpenFile
-      - os.WriteFile
-
-linters:
-  disable-all: true
-  enable:
-    - revive
-    - govet
-    - unconvert
-    - gosec
-    - misspell
-    - unused
-    - typecheck
-    - ineffassign
-    - stylecheck
-    - gochecknoinits
-    - gocritic
-    - nakedret
-    - gosimple
-    - prealloc
-    - usetesting
-    - testifylint
-    - nonamedreturns
-    - errcheck
-    - funlen
-    - errname
-    - exptostd
-    - gocognit
-    - cyclop
-    - intrange
-    - iface
-    - mnd
-    - nestif
-    - nilerr
-    - predeclared
-    - unconvert
-    - wrapcheck
-    - goheader
-    - gci
-  fast: false
-
+version: "2"
 run:
   concurrency: 4
-
-issues:
-  exclude-dirs:
-    - vendor
-  exclude-rules:
-    - text: "should have a package comment, unless it's in another file for this package"
-      linters:
-        - revive
-    - text: "exitAfterDefer:"
-      linters:
-        - gocritic
-    - text: "whyNoLint: include an explanation for nolint directive"
-      linters:
-        - gocritic
-    - text: "go.mongodb.org/mongo-driver/bson/primitive.E"
-      linters:
-        - govet
-    - text: "weak cryptographic primitive"
-      linters:
-        - gosec
-    - text: "at least one file in a package should have a package comment"
-      linters:
-        - stylecheck
-    - text: "package-comments: should have a package comment"
-      linters:
-        - revive
-    - text: 'Deferring unsafe method "Close" on type "io.ReadCloser"'
-      linters:
-        - gosec
-    - linters:
-        - unparam
-        - unused
-        - revive
-      path: _test\.go$
-    - text: "Potential file inclusion via variable"
-      linters:
-        - gosec
-      path: _test\.go$
-    - text: "should have a package comment"
-      linters:
-        - revive
-    - text: "Error return value of .+Close. is not checked"
-      path: _test\.go$
-      linters:
-        - errcheck
-    - path: "_test\\.go"
-      linters:
-        - bodyclose
-        - dupl
-        - errcheck
-        - funlen
-        - goconst
-        - gosec
-        - noctx
-        - wrapcheck
-  exclude-use-default: false
+linters:
+  default: none
+  enable:
+    - cyclop
+    - errcheck
+    - errname
+    - exptostd
+    - funlen
+    - gochecknoinits
+    - gocognit
+    - gocritic
+    - goheader
+    - gosec
+    - govet
+    - iface
+    - ineffassign
+    - intrange
+    - misspell
+    - mnd
+    - nakedret
+    - nestif
+    - nilerr
+    - nonamedreturns
+    - prealloc
+    - predeclared
+    - revive
+    - staticcheck
+    - testifylint
+    - unconvert
+    - unused
+    - usetesting
+    - wrapcheck
+  settings:
+    cyclop:
+      max-complexity: 20
+      package-average: 10
+    dupl:
+      threshold: 100
+    errcheck:
+      check-type-assertions: true
+      exclude-functions:
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - fmt.Fprint
+    funlen:
+      lines: 100
+      statements: 50
+      ignore-comments: true
+    goconst:
+      min-len: 2
+      min-occurrences: 2
+    gocritic:
+      disabled-checks:
+        - wrapperFunc
+        - hugeParam
+        - rangeValCopy
+      enabled-tags:
+        - performance
+        - style
+        - experimental
+    gocyclo:
+      min-complexity: 15
+    lll:
+      line-length: 140
+    misspell:
+      locale: US
+    mnd:
+      ignored-functions:
+        - args.Error
+        - flag.Arg
+        - flag.Duration.*
+        - flag.Float.*
+        - flag.Int.*
+        - flag.Uint.*
+        - os.Chmod
+        - os.Mkdir.*
+        - os.OpenFile
+        - os.WriteFile
+  exclusions:
+    generated: lax
+    rules:
+      - linters:
+          - revive
+        text: should have a package comment, unless it's in another file for this package
+      - linters:
+          - gocritic
+        text: 'exitAfterDefer:'
+      - linters:
+          - gocritic
+        text: 'whyNoLint: include an explanation for nolint directive'
+      - linters:
+          - govet
+        text: go.mongodb.org/mongo-driver/bson/primitive.E
+      - linters:
+          - gosec
+        text: weak cryptographic primitive
+      - linters:
+          - staticcheck
+        text: at least one file in a package should have a package comment
+      - linters:
+          - revive
+        text: 'package-comments: should have a package comment'
+      - linters:
+          - gosec
+        text: Deferring unsafe method "Close" on type "io.ReadCloser"
+      - linters:
+          - revive
+          - unparam
+          - unused
+        path: _test\.go$
+      - linters:
+          - gosec
+        path: _test\.go$
+        text: Potential file inclusion via variable
+      - linters:
+          - revive
+        text: should have a package comment
+      - linters:
+          - errcheck
+        path: _test\.go$
+        text: Error return value of .+Close. is not checked
+      - linters:
+          - bodyclose
+          - dupl
+          - errcheck
+          - funlen
+          - goconst
+          - gosec
+          - noctx
+          - wrapcheck
+        path: _test\.go
+    paths:
+      - vendor
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gci
+  exclusions:
+    generated: lax
+    paths:
+      - vendor
+      - third_party$
+      - builtin$
+      - examples$

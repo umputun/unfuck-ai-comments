@@ -1746,9 +1746,9 @@ func TestModeSelection(t *testing.T) {
 				p := flags.NewParser(&opts, flags.Default)
 
 				// simulate command selection
-				cmd := p.Command.Find(cmdName)
+				cmd := p.Find(cmdName)
 				require.NotNil(t, cmd, "Command should exist")
-				p.Command.Active = cmd
+				p.Active = cmd
 
 				// set test pattern
 				switch cmdName {
@@ -2136,7 +2136,7 @@ func TestSimpleDiff(t *testing.T) {
 				assert.Contains(t, diff, expect, "Diff should contain expected changes")
 			}
 			if len(test.expect) == 0 {
-				assert.Equal(t, "", diff, "Diff should be empty when no changes")
+				assert.Empty(t, diff, "Diff should be empty when no changes")
 			}
 		})
 	}

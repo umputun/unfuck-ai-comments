@@ -32,9 +32,7 @@ jobs:
         cat $GITHUB_WORKSPACE/profile.cov_tmp | grep -v "mocks" | grep -v "_mock" > $GITHUB_WORKSPACE/profile.cov
 
     - name: golangci-lint
-      uses: golangci/golangci-lint-action@v6
-      with:
-        version: v1.64
+      uses: golangci/golangci-lint-action@v7
 
     - name: install goveralls
       run: go install github.com/mattn/goveralls@latest

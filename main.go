@@ -180,8 +180,8 @@ func determineProcessingMode(opts Options, p *flags.Parser) ProcessingResult {
 	}
 
 	// get processing mode and patterns based on active command
-	if p.Command.Active != nil {
-		switch p.Command.Active.Name {
+	if p.Active != nil {
+		switch p.Active.Name {
 		case "run":
 			return ProcessingResult{
 				Mode:     "inplace",
