@@ -164,64 +164,78 @@ unfuck-ai-comments run --backup ./...
 
 ## How it works
 
-The tool uses Go's AST parser to identify comments that are inside functions or structs, while leaving package comments, function documentation, and other structural comments untouched.
+The tool uses Go's AST (Abstract Syntax Tree) parser to intelligently identify and process comments based on their context in the code. Here's a detailed explanation of how it works:
 
-The tool automatically skips generated files that start with the standard Go comment marker `// Code generated`. These files are typically produced by tools like `go generate` and should not be modified.
+### File Processing and Analysis
 
-Comments inside function bodies and struct definitions are modified to be lowercase (or title case if the `--title` option is used). This includes:
+1. **AST Parsing**: The tool uses Go's `parser` package to create an AST representation of each Go file, which allows it to understand the structure of the code and the context of each comment.
 
-- Comments inside function bodies
-- Comments inside struct field definitions
-- Nested comments in control structures (if/for/switch)
-- Inline comments next to code
+2. **Skip Mechanisms**:
+   - Automatically skips the `vendor/` and `testdata/` directories (common in Go projects)
+   - Skips generated files that contain the standard Go comment marker `// Code generated`
+   - Respects custom skip patterns specified with the `--skip` flag
 
-### Special Indicator Comments
+3. **Recursive Processing**: When using `./...` pattern, the tool recursively walks through directories to find all `.go` files.
+
+### Intelligent Comment Detection
+
+The tool carefully distinguishes between different types of comments:
+
+1. **Documentation Comments**: Comments outside functions that document packages, types, or exported identifiers are preserved in their original form.
+
+2. **Inside-Function Comments**: The tool identifies comments that appear:
+   - Inside function bodies
+   - Inside struct field definitions
+   - Inside variable and constant blocks
+   - Inside control structures (if/for/switch)
+
+3. **Identifier Documentation**: The tool preserves comments that follow the standard Go pattern of "IdentifierName is..." which are typically used for documenting constants, variables, and other declarations.
+
+### Comment Modification Logic
+
+When processing comments, the tool applies several intelligent rules:
+
+1. **Title Case Mode** (default):
+   - Only converts the first character of a comment to lowercase
+   - Preserves all-uppercase abbreviations like "AI", "CPU", "HTTP"
+   - Ensures the first word isn't a camelCase/PascalCase identifier
+   - Checks if the first word is entirely uppercase (at least 2 characters) and preserves it if true
+
+2. **Full Lowercase Mode**:
+   - Converts the entire comment to lowercase
+   - Intelligently preserves camelCase and PascalCase identifiers to maintain code readability
+
+3. **Technical Comments Handling**:
+   - Handles double comment format like `nolint:gosec // using math/rand is acceptable for tests`
+   - Properly processes the actual comment part while preserving directives
+
+### Special Indicator Preservation
 
 Comments that begin with special indicators are preserved completely unchanged:
 
-- `TODO`
-- `FIXME`
-- `HACK`
-- `XXX`
-- `NOTE`
-- `BUG`
-- `IDEA`
-- `OPTIMIZE`
-- `REVIEW`
-- `TEMP`
-- `DEBUG`
-- `NB`
-- `WARNING`
-- `DEPRECATED`
-- `NOTICE`
+- `TODO`, `FIXME`, `HACK`, `XXX`, `NOTE`, `BUG`, `IDEA`
+- `OPTIMIZE`, `REVIEW`, `TEMP`, `DEBUG`, `NB` 
+- `WARNING`, `DEPRECATED`, `NOTICE`
 
-For example:
-```go
-func Example() {
-    // TODO This comment will remain COMPLETELY unchanged
-    // this regular comment will be converted to lowercase
-    // FIXME: This will also remain untouched
-}
-```
+These indicators are important for marking code that needs attention and are intentionally left in their original form.
 
 ### Identifier Preservation
 
-The tool intelligently preserves camelCase and PascalCase identifiers in comments:
+The tool uses sophisticated detection for camelCase and PascalCase identifiers:
 
-```go
-func Example() {
-    // THIS USES someVariableName AND SomeImportantClass to demonstrate
-    // becomes:
-    // this uses someVariableName and SomeImportantClass to demonstrate
-}
-```
+- PascalCase detection requires an uppercase first letter, at least one more uppercase letter followed by lowercase, and no consecutive uppercase letters
+- CamelCase detection looks for an uppercase letter that isn't the first character
 
-In title case mode (default), the tool also preserves all-uppercase abbreviations like "AI", "CPU", etc.
+All such identifiers within comments are preserved in their original form, ensuring that references to code elements remain clear and recognizable.
 
-```go
-func Example() {
-    // AI PROCESSING starts here
-    // becomes:
-    // AI processing starts here
-}
-```
+### Output Modes
+
+The tool supports three different output modes:
+
+1. **In-place Mode** (`run`): Directly modifies the source files, with optional backups (when `--backup` is used)
+
+2. **Diff Mode** (`diff` or `--dry`): Shows a colorized diff of changes without modifying files, using red for removed lines and green for added lines
+
+3. **Print Mode** (`print`): Outputs the processed content to stdout without changing the original files
+
+When enabled with the `--fmt` flag, all output is also processed through `gofmt` to ensure consistent formatting.
