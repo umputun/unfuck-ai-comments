@@ -985,6 +985,223 @@ func TestFunc() {
 	})
 }
 
+// TestUnicodeCommentProcessing tests that Unicode characters in comments are handled correctly
+func TestUnicodeCommentProcessing(t *testing.T) {
+	tempDir := t.TempDir()
+	testFile := filepath.Join(tempDir, "unicode_test.go")
+
+	// test content with Unicode characters
+	content := `package main
+
+func main() {
+	switch role {
+	case "nova":    // Мария - analytical and pragmatic
+	case "test":    // 你好 - chinese hello
+	case "emoji":   // 🎉 celebration emoji
+	case "mixed":   // Привет world - mixed script
+	}
+}`
+
+	err := os.WriteFile(testFile, []byte(content), 0o600)
+	require.NoError(t, err, "Failed to create test file")
+
+	t.Run("title case mode preserves Unicode", func(t *testing.T) {
+		// capture output
+		var stdoutBuf, stderrBuf bytes.Buffer
+		writers := OutputWriters{
+			Stdout: &stdoutBuf,
+			Stderr: &stderrBuf,
+		}
+
+		// process file with title case (default)
+		processFile(testFile, "print", false, false, writers)
+
+		output := stdoutBuf.String()
+		// verify Unicode characters are preserved correctly
+		assert.Contains(t, output, "// мария - analytical and pragmatic", "Cyrillic should be lowercased correctly")
+		assert.Contains(t, output, "// 你好 - chinese hello", "Chinese characters should be preserved")
+		assert.Contains(t, output, "// 🎉 celebration emoji", "Emoji should be preserved")
+		assert.Contains(t, output, "// привет world - mixed script", "Mixed script should be handled correctly")
+
+		// make sure we don't have corrupted characters
+		assert.NotContains(t, output, "ð", "Should not contain corrupted Unicode")
+		assert.NotContains(t, output, "�", "Should not contain replacement character")
+	})
+
+	t.Run("full lowercase mode preserves Unicode", func(t *testing.T) {
+		// capture output
+		var stdoutBuf, stderrBuf bytes.Buffer
+		writers := OutputWriters{
+			Stdout: &stdoutBuf,
+			Stderr: &stderrBuf,
+		}
+
+		// process file with full lowercase
+		processFile(testFile, "print", true, false, writers)
+
+		output := stdoutBuf.String()
+		// verify Unicode characters are preserved correctly in full lowercase mode
+		assert.Contains(t, output, "// мария - analytical and pragmatic", "Cyrillic should be fully lowercased")
+		assert.Contains(t, output, "// 你好 - chinese hello", "Chinese characters should be preserved")
+		assert.Contains(t, output, "// 🎉 celebration emoji", "Emoji should be preserved")
+		assert.Contains(t, output, "// привет world - mixed script", "Mixed script should be fully lowercased")
+
+		// make sure we don't have corrupted characters
+		assert.NotContains(t, output, "ð", "Should not contain corrupted Unicode")
+		assert.NotContains(t, output, "�", "Should not contain replacement character")
+	})
+}
+
+// TestUnicodeEdgeCases tests edge cases for Unicode handling
+func TestUnicodeEdgeCases(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		expected    string
+		fullMode    bool
+		description string
+	}{
+		{
+			name:        "Unicode in leading whitespace",
+			input:       "// 　　Hello World", // full-width spaces (U+3000)
+			expected:    "// 　　hello World",
+			fullMode:    false,
+			description: "Should handle Unicode whitespace correctly",
+		},
+		{
+			name:        "Unicode first word detection",
+			input:       "// МАРИЯ is a name",
+			expected:    "// МАРИЯ is a name", // all uppercase Cyrillic preserved
+			fullMode:    false,
+			description: "Should detect all-uppercase Unicode words",
+		},
+		{
+			name:        "Mixed Unicode identifier",
+			input:       "// МарияName is a variable",
+			expected:    "// МарияName is a variable", // preserved as identifier
+			fullMode:    false,
+			description: "Should preserve mixed Unicode identifiers",
+		},
+		{
+			name:        "Unicode at word boundary",
+			input:       "// Test世界 here",
+			expected:    "// test世界 here",
+			fullMode:    false,
+			description: "Should handle Unicode at word boundaries",
+		},
+		{
+			name:        "Single Unicode character comment",
+			input:       "// 世",
+			expected:    "// 世",
+			fullMode:    false,
+			description: "Should handle single Unicode character",
+		},
+		{
+			name:        "Unicode with technical comment",
+			input:       "//nolint:gosec // Мария says it's safe",
+			expected:    "//nolint:gosec // мария says it's safe",
+			fullMode:    false,
+			description: "Should handle Unicode in technical comments",
+		},
+		{
+			name:        "Emoji at start",
+			input:       "// 🎉 Celebration time",
+			expected:    "// 🎉 Celebration time", // emoji is not a letter, so next word is processed
+			fullMode:    false,
+			description: "Should handle emoji at start correctly",
+		},
+		{
+			name:        "Complex Unicode grapheme",
+			input:       "// 👨‍👩‍👧‍👦 Family emoji", // family emoji with ZWJ
+			expected:    "// 👨‍👩‍👧‍👦 Family emoji",
+			fullMode:    false,
+			description: "Should handle complex Unicode graphemes",
+		},
+		{
+			name:        "Right-to-left text",
+			input:       "// مرحبا بالعالم hello", // arabic "Hello world"
+			expected:    "// مرحبا بالعالم hello",
+			fullMode:    false,
+			description: "Should handle RTL text correctly",
+		},
+		{
+			name:        "Unicode identifier preservation in full mode",
+			input:       "// Test МарияName variable",
+			expected:    "// test МарияName variable",
+			fullMode:    true,
+			description: "Should preserve Unicode identifiers in full lowercase mode",
+		},
+		{
+			name:        "Invalid UTF-8 sequence",
+			input:       "// Hello \xc3\x28 world", // invalid UTF-8
+			expected:    "// hello �( world",       // go replaces invalid UTF-8 with replacement character
+			fullMode:    false,
+			description: "Should handle invalid UTF-8 without panic",
+		},
+		{
+			name:        "Incomplete UTF-8 sequence at end",
+			input:       "// Test \xc3", // incomplete UTF-8 at end
+			expected:    "// test �",    // go replaces incomplete UTF-8 with replacement character
+			fullMode:    false,
+			description: "Should handle incomplete UTF-8 sequence",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var result string
+			if tt.fullMode {
+				result = convertCommentToLowercase(tt.input)
+			} else {
+				result = convertCommentToTitleCase(tt.input)
+			}
+			assert.Equal(t, tt.expected, result, tt.description)
+		})
+	}
+}
+
+// TestGetCommentIdentifiersUnicode tests identifier extraction with Unicode
+func TestGetCommentIdentifiersUnicode(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		expected    []string
+		description string
+	}{
+		{
+			name:        "Unicode PascalCase",
+			input:       "МарияName is a variable",
+			expected:    []string{"МарияName"},
+			description: "Should detect Unicode PascalCase identifiers",
+		},
+		{
+			name:        "Unicode camelCase",
+			input:       "testМария is a function",
+			expected:    []string{"testМария"},
+			description: "Should detect Unicode camelCase identifiers",
+		},
+		{
+			name:        "Pure Cyrillic not identifier",
+			input:       "Привет мир",
+			expected:    nil,
+			description: "Pure Cyrillic words are not identifiers",
+		},
+		{
+			name:        "Mixed scripts in identifier",
+			input:       "Test世界Name and another世界Test",
+			expected:    []string{"Test世界Name", "another世界Test"},
+			description: "Should handle mixed script identifiers",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getCommentIdentifiers(tt.input)
+			assert.Equal(t, tt.expected, result, tt.description)
+		})
+	}
+}
+
 // TestMainFunctionMock creates a mock version of main to test all branches
 func TestMainFunctionMock(t *testing.T) {
 	// create a temporary directory for test files

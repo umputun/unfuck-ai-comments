@@ -62,11 +62,11 @@ var (
 
 	// ANOTHER Comment to PROCESS
 	configPath string = "/etc/config.json" // ANOTHER Inline COMMENT to process
-	
+
 	// DocumentedVar is a variable with documentation - this comment should NOT be converted
 	// because it follows the "VarName is..." pattern
 	DocumentedVar string = "documented"
-	
+
 	// This comment doesn't follow the naming pattern and SHOULD be converted
 	UndocumentedVar string = "undocumented"
 )
@@ -81,11 +81,11 @@ const (
 
 	// ANOTHER Comment to PROCESS
 	maxRetries int = 3 // ANOTHER Inline COMMENT to process
-	
+
 	// DocumentedConst is a documented constant - this comment should NOT be converted
 	// because it follows the "ConstName is..." pattern
 	DocumentedConst int = 400
-	
+
 	// This comment doesn't follow the naming pattern and SHOULD be converted
 	UndocumentedConst int = 500
 )
@@ -101,28 +101,28 @@ func helperFunction() {
 	OtherVariable := "PascalCase"   // PascalCase should be preserved
 	_ = someVariableName
 	_ = OtherVariable
-	
+
 	// Testing technical linter directives
 	r := true //nolint:gosec // Using math/rand is ACCEPTABLE for tests
 	_ = r
-	
+
 	// Local vars and consts inside functions
 	var (
 		// THIS SHOULD be converted (inside function & var block)
 		localVar string = "test"
-		
+
 		// ANOTHER Local Comment
 		count int = 0
 	)
-	
+
 	const (
 		// THIS SHOULD be converted (inside function & const block)
 		localConst float64 = 3.14
-		
+
 		// ANOTHER Local Comment
 		maxCount int = 100
 	)
-	
+
 	_ = localVar
 	_ = count
 	_ = localConst

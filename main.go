@@ -15,6 +15,7 @@ import (
 	"runtime/debug"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/fatih/color"
 	"github.com/jessevdk/go-flags"
@@ -767,39 +768,55 @@ func processCommentPart(content string, fullLowercase bool, identifiers []string
 	}
 
 	// check if the first word is all uppercase (for abbreviations like AI, CPU)
-	firstWordEnd := 0
+	firstWordRuneCount := 0
 	isAllUppercase := true
-	for i, r := range remainingContent {
+	// find the end of the first word in bytes for identifier comparison
+	firstWordByteEnd := 0
+	byteIndex := 0
+	for _, r := range remainingContent {
+		runeSize := utf8.RuneLen(r)
 		if unicode.IsSpace(r) || !unicode.IsLetter(r) {
-			firstWordEnd = i
+			firstWordByteEnd = byteIndex
 			break
 		}
 		if !unicode.IsUpper(r) {
 			isAllUppercase = false
 		}
-		if i == len(remainingContent)-1 {
-			firstWordEnd = i + 1 // handle case where comment is a single word
-		}
+		firstWordRuneCount++
+		byteIndex += runeSize
+	}
+	// if we reached the end without finding a word boundary
+	if firstWordByteEnd == 0 {
+		firstWordByteEnd = len(remainingContent)
 	}
 
 	// if first word is all uppercase and at least 2 characters, preserve it
-	if isAllUppercase && firstWordEnd >= 2 {
+	if isAllUppercase && firstWordRuneCount >= 2 {
 		return content
 	}
 
 	// check if the first word is in identifiers and preserve it
-	for _, id := range identifiers {
-		if strings.EqualFold(id, remainingContent[:firstWordEnd]) {
-			return content
+	if firstWordByteEnd > 0 {
+		firstWord := remainingContent[:firstWordByteEnd]
+		for _, id := range identifiers {
+			if strings.EqualFold(id, firstWord) {
+				return content
+			}
 		}
 	}
 
 	// otherwise convert first character to lowercase
-	firstChar := strings.ToLower(string(remainingContent[0]))
-	if len(remainingContent) > 1 {
-		return leadingWhitespace + firstChar + remainingContent[1:]
+	// use rune to properly handle multi-byte Unicode characters
+	runes := []rune(remainingContent)
+	if len(runes) == 0 {
+		return leadingWhitespace
 	}
-	return leadingWhitespace + firstChar
+
+	firstRune := unicode.ToLower(runes[0])
+	if len(runes) > 1 {
+		return leadingWhitespace + string(firstRune) + string(runes[1:])
+	}
+	return leadingWhitespace + string(firstRune)
 }
 
 // getCommentIdentifiers extracts identifiers from a comment
@@ -808,19 +825,20 @@ func getCommentIdentifiers(content string) []string {
 	isPascalCase := func(s string) bool {
 		// pascal case requires uppercase first letter, at least one more uppercase letter
 		// followed by lowercase, and no consecutive uppercase letters
-		if len(s) < 2 || !unicode.IsUpper(rune(s[0])) {
+		runes := []rune(s)
+		if len(runes) < 2 || !unicode.IsUpper(runes[0]) {
 			return false
 		}
 
 		foundSecondUpper := false
-		for i := 1; i < len(s); i++ {
+		for i := 1; i < len(runes); i++ {
 			// check for consecutive uppercase letters (which invalidates pascal case)
-			if unicode.IsUpper(rune(s[i])) && i > 0 && unicode.IsUpper(rune(s[i-1])) {
+			if unicode.IsUpper(runes[i]) && i > 0 && unicode.IsUpper(runes[i-1]) {
 				return false
 			}
 
 			// valid pattern: uppercase followed by lowercase
-			if unicode.IsUpper(rune(s[i])) && i+1 < len(s) && unicode.IsLower(rune(s[i+1])) {
+			if unicode.IsUpper(runes[i]) && i+1 < len(runes) && unicode.IsLower(runes[i+1]) {
 				foundSecondUpper = true
 			}
 		}
