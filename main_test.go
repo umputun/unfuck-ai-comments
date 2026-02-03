@@ -1551,18 +1551,16 @@ func TestHelperFunctions(t *testing.T) {
 		// create temporary directory for testing
 		tempDir := t.TempDir()
 
-		// create test files
-		testFiles := []string{
-			filepath.Join(tempDir, "file1.go"),
-			filepath.Join(tempDir, "file2.go"),
-		}
-
 		// create subdirectory
 		err := os.MkdirAll(filepath.Join(tempDir, "subdir"), 0o750)
 		require.NoError(t, err)
 
-		// create a file in subdirectory
-		testFiles = append(testFiles, filepath.Join(tempDir, "subdir", "file3.go"))
+		// create test files
+		testFiles := []string{
+			filepath.Join(tempDir, "file1.go"),
+			filepath.Join(tempDir, "file2.go"),
+			filepath.Join(tempDir, "subdir", "file3.go"),
+		}
 
 		// create all test files
 		for _, file := range testFiles {
