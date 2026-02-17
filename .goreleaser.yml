@@ -41,6 +41,7 @@ archives:
     files:
       - LICENSE
       - README.md
+      - completions/*
     rlcp: true
 
 
@@ -59,6 +60,10 @@ brews:
     homepage: "https://unfuck-ai-comments.umputun.dev"
     description: "unfuck-ai-comments is a tool that converts all comments inside Go functions to lowercase"
     license: "MIT"
+    extra_install: |
+      bash_completion.install "completions/unfuck-ai-comments.bash" => "unfuck-ai-comments"
+      zsh_completion.install "completions/unfuck-ai-comments.zsh" => "_unfuck-ai-comments"
+      fish_completion.install "completions/unfuck-ai-comments.fish" => "unfuck-ai-comments.fish"
 
 nfpms:
   - id: unfuck-ai-comments
@@ -76,3 +81,10 @@ nfpms:
     bindir: /usr/bin
     epoch: 1
     release: 1
+    contents:
+      - src: completions/unfuck-ai-comments.bash
+        dst: /usr/share/bash-completion/completions/unfuck-ai-comments
+      - src: completions/unfuck-ai-comments.zsh
+        dst: /usr/share/zsh/vendor-completions/_unfuck-ai-comments
+      - src: completions/unfuck-ai-comments.fish
+        dst: /usr/share/fish/vendor_completions.d/unfuck-ai-comments.fish

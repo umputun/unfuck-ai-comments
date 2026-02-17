@@ -127,7 +127,7 @@ func parseCommandLineOptions(writers OutputWriters) (Options, *flags.Parser, err
 	p.LongDescription = "Convert in-function comments to lowercase while preserving comments outside functions"
 
 	// check for standalone --version/-v flag before regular parsing
-	if len(os.Args) == 2 && (os.Args[1] == "-v" || os.Args[1] == "--version") {
+	if os.Getenv("GO_FLAGS_COMPLETION") == "" && len(os.Args) == 2 && (os.Args[1] == "-v" || os.Args[1] == "--version") {
 		showVersionInfo(writers.Stdout)
 		return opts, p, ErrVersionRequested
 	}
@@ -144,7 +144,7 @@ func parseCommandLineOptions(writers OutputWriters) (Options, *flags.Parser, err
 	}
 
 	// display version information if requested through the regular option
-	if opts.Version {
+	if os.Getenv("GO_FLAGS_COMPLETION") == "" && opts.Version {
 		showVersionInfo(writers.Stdout)
 		return opts, p, ErrVersionRequested
 	}
