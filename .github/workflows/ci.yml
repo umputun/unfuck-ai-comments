@@ -3,10 +3,10 @@ on:
   push:
     branches:
     tags:
-    paths_ignored:
+    paths-ignore:
       - "**.md"
   pull_request:
-    paths_ignored:
+    paths-ignore:
       - "**.md"
 
 permissions:
@@ -37,8 +37,6 @@ jobs:
 
     - name: golangci-lint
       uses: golangci/golangci-lint-action@v9
-      with:
-        version: "v2.11.1"
 
     - name: submit coverage
       run: |
