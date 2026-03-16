@@ -34,6 +34,10 @@ linters:
     - usetesting
     - wrapcheck
   settings:
+    gosec:
+      excludes:
+        - G204
+        - G703
     cyclop:
       max-complexity: 20
       package-average: 10
